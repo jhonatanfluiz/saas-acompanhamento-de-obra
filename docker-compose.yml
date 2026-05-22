@@ -1,0 +1,57 @@
+version: '3.8'
+
+services:
+  evolution-api:
+    image: atendare/evolution-api:latest
+    container_name: evolution-api
+    restart: always
+    ports:
+      - "8080:8080"
+    environment:
+      # Configurações Gerais
+      - SERVER_PORT=8080
+      - SERVER_URL=http://localhost:8080
+      - SERVER_TYPE=http
+      - LOG_LEVEL=ERROR,WARN,INFO
+      - DELAY_MESSAGES=true
+      
+      # Segurança (API Key administrativa para criar instâncias, etc.)
+      - API_KEY=sua_apikey_da_evolution
+      
+      # Habilitar endpoints da API
+      - CORS_ORIGIN=*
+      - CORS_METHODS=GET,POST,PUT,DELETE,OPTIONS
+      - CORS_HEADERS=Content-Type,Authorization,apikey
+      
+      # Banco de dados temporário / Sessões locais
+      - DATABASE_ENABLED=false
+      
+      # Redis para cache (Melhora muito a performance e estabilidade das sessões do WhatsApp)
+      - REDIS_ENABLED=true
+      - REDIS_URI=redis://redis:6379
+      
+      # Webhooks padrões (Opcional - pode ser configurado por instância)
+      - WEBHOOK_GLOBAL_ENABLED=false
+      
+    depends_on:
+      - redis
+    networks:
+      - evolution-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: evolution-redis
+    restart: always
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - evolution-network
+
+volumes:
+  redis_data:
+
+networks:
+  evolution-network:
+    driver: bridge

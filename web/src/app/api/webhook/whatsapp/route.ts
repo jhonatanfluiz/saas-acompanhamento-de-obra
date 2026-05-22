@@ -38,14 +38,21 @@ export async function POST(req: Request) {
     // Extrair apenas o número de telefone
     const phone = remoteJid.split('@')[0].replace(/\D/g, '');
 
-    // 1. Validar resposta SIM ou NÃO
+    // 1. Validar resposta SIM, NÃO ou porcentagem (25%, 50%, 75%, 100%)
     const respostaUpper = textMessage.trim().toUpperCase();
-    if (respostaUpper !== 'SIM' && respostaUpper !== 'NÃO' && respostaUpper !== 'NAO') {
-      await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Por favor, responda apenas com SIM ou NÃO.');
+    const regexValida = /^(SIM|NÃO|NAO|25%|50%|75%|100%|25|50|75|100)$/i;
+    
+    if (!regexValida.test(respostaUpper)) {
+      await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Por favor, responda com SIM, NÃO ou uma porcentagem de progresso (25%, 50%, 75% ou 100%).');
       return NextResponse.json({ message: 'Resposta inválida' }, { status: 200 });
     }
 
-    const respostaFinal = (respostaUpper === 'NAO') ? 'NÃO' : respostaUpper;
+    let respostaFinal = respostaUpper;
+    if (respostaFinal === 'NAO') {
+      respostaFinal = 'NÃO';
+    } else if (['25', '50', '75', '100'].includes(respostaFinal)) {
+      respostaFinal = `${respostaFinal}%`;
+    }
 
     // 2. Identificar Usuário pelo telefone (Tabela: usuarios)
     const { data: usuario } = await supabase
@@ -166,7 +173,7 @@ export async function POST(req: Request) {
     const proximaPergunta = perguntasOrdenadas.find((p: any) => p.id !== perguntaPendente.id && !respondidasIds.includes(p.id));
 
     if (proximaPergunta) {
-      await enviarMensagemWhatsApp(remoteJid, `Anotado!\n\nPróxima pergunta da fase *${faseAtual.nome}*:\n\n👉 *${proximaPergunta.texto_pergunta}*\n\nResponda apenas com *SIM* ou *NÃO*.`);
+      await enviarMensagemWhatsApp(remoteJid, `Anotado!\n\nPróxima pergunta da fase *${faseAtual.nome}*:\n\n👉 *${proximaPergunta.texto_pergunta}*\n\nResponda com *SIM*, *NÃO* ou o progresso estimado (*25%*, *50%*, *75%*, *100%*).`);
     } else {
       // Fase concluída! Vamos buscar a próxima fase pendente da obra em ordem crescente
       const proximasFases = ((obra.fases as any[]) || []).sort((a, b) => a.ordem - b.ordem);
@@ -179,7 +186,7 @@ export async function POST(req: Request) {
 
         await enviarMensagemWhatsApp(
           remoteJid,
-          `Excelente! Você concluiu a fase *${faseAtual.nome}* da obra *${obra.nome}*.\n\nVamos iniciar a próxima fase *${proximaFase.nome}*!\n\nPergunta 1:\n👉 *${primeiraPerguntaProxima.texto_pergunta}*\n\nResponda apenas com *SIM* ou *NÃO*.`
+          `Excelente! Você concluiu a fase *${faseAtual.nome}* da obra *${obra.nome}*.\n\nVamos iniciar a próxima fase *${proximaFase.nome}*!\n\nPergunta 1:\n👉 *${primeiraPerguntaProxima.texto_pergunta}*\n\nResponda com *SIM*, *NÃO* ou o progresso estimado (*25%*, *50%*, *75%*, *100%*).`
         );
       } else {
         await enviarMensagemWhatsApp(

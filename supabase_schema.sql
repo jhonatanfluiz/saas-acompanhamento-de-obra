@@ -1,7 +1,14 @@
 -- Estrutura SQL para Sistema SaaS de Acompanhamento de Obras
--- Preparado para o Supabase
+-- Preparado para o Supabase (Multi-tenant e respostas flexíveis)
 
 -- 1. Limpeza (caso exista estrutura anterior)
+DROP VIEW IF EXISTS public.vw_status_obras CASCADE;
+DROP TRIGGER IF EXISTS trg_atualiza_progresso ON public.respostas CASCADE;
+DROP TRIGGER IF EXISTS trg_normaliza_resposta ON public.respostas CASCADE;
+DROP FUNCTION IF EXISTS public.atualizar_progresso_fase_obra() CASCADE;
+DROP FUNCTION IF EXISTS public.normalizar_resposta() CASCADE;
+DROP FUNCTION IF EXISTS public.get_user_empresa_id() CASCADE;
+
 DROP TABLE IF EXISTS public.relatorios CASCADE;
 DROP TABLE IF EXISTS public.alertas CASCADE;
 DROP TABLE IF EXISTS public.respostas CASCADE;
@@ -9,18 +16,27 @@ DROP TABLE IF EXISTS public.perguntas CASCADE;
 DROP TABLE IF EXISTS public.fases CASCADE;
 DROP TABLE IF EXISTS public.obras CASCADE;
 DROP TABLE IF EXISTS public.usuarios CASCADE;
+DROP TABLE IF EXISTS public.tenants CASCADE;
 
--- 2. Tabela: Usuários (Estendendo auth.users)
+-- 2. Tabela: Tenants (Empresas)
+CREATE TABLE public.tenants (
+  id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
+  name text NOT NULL,
+  created_at timestamp with time zone DEFAULT now()
+);
+
+-- 3. Tabela: Usuários (Estendendo auth.users)
 CREATE TABLE public.usuarios (
   id uuid PRIMARY KEY REFERENCES auth.users(id) ON DELETE CASCADE,
   nome text NOT NULL,
   email text UNIQUE NOT NULL,
   telefone text,
   funcao text DEFAULT 'usuario', -- Ex: 'admin', 'mestre_obras', 'usuario'
+  tenant_id uuid REFERENCES public.tenants(id) ON DELETE SET NULL,
   created_at timestamp with time zone DEFAULT now()
 );
 
--- 3. Tabela: Obras
+-- 4. Tabela: Obras
 CREATE TABLE public.obras (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   nome text NOT NULL,
@@ -30,11 +46,17 @@ CREATE TABLE public.obras (
   status text DEFAULT 'ativa', -- 'ativa', 'concluida', 'pausada'
   progresso_total numeric DEFAULT 0.0 CHECK (progresso_total >= 0 AND progresso_total <= 100),
   data_inicio date,
+  data_entrega_prevista date,
+  orcamento_total numeric,
+  manager_name text,
+  manager_phone text,
+  custom_greeting text,
+  tenant_id uuid REFERENCES public.tenants(id) ON DELETE CASCADE,
   created_at timestamp with time zone DEFAULT now(),
   created_by uuid REFERENCES public.usuarios(id)
 );
 
--- 4. Tabela: Fases (20 por obra)
+-- 5. Tabela: Fases (20 por obra)
 CREATE TABLE public.fases (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   obra_id uuid NOT NULL REFERENCES public.obras(id) ON DELETE CASCADE,
@@ -46,7 +68,7 @@ CREATE TABLE public.fases (
   UNIQUE(obra_id, ordem)
 );
 
--- 5. Tabela: Perguntas (2 por fase)
+-- 6. Tabela: Perguntas (2 a 4 por fase)
 CREATE TABLE public.perguntas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   fase_id uuid NOT NULL REFERENCES public.fases(id) ON DELETE CASCADE,
@@ -56,19 +78,19 @@ CREATE TABLE public.perguntas (
   UNIQUE(fase_id, ordem)
 );
 
--- 6. Tabela: Respostas (Aceitam SIM ou NÃO)
+-- 7. Tabela: Respostas (Aceitam SIM, NÃO ou porcentagens)
 CREATE TABLE public.respostas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   obra_id uuid NOT NULL REFERENCES public.obras(id) ON DELETE CASCADE,
   fase_id uuid NOT NULL REFERENCES public.fases(id) ON DELETE CASCADE,
   pergunta_id uuid NOT NULL REFERENCES public.perguntas(id) ON DELETE CASCADE,
-  resposta text NOT NULL CHECK (resposta IN ('SIM', 'NÃO')),
+  resposta text NOT NULL CHECK (resposta IN ('SIM', 'NÃO', '25%', '50%', '75%', '100%')),
   observacao text,
   usuario_responsavel uuid REFERENCES public.usuarios(id) ON DELETE SET NULL,
   data_resposta timestamp with time zone DEFAULT now()
 );
 
--- 7. Tabela: Alertas
+-- 8. Tabela: Alertas
 CREATE TABLE public.alertas (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   obra_id uuid NOT NULL REFERENCES public.obras(id) ON DELETE CASCADE,
@@ -79,7 +101,7 @@ CREATE TABLE public.alertas (
   created_at timestamp with time zone DEFAULT now()
 );
 
--- 8. Tabela: Relatórios
+-- 9. Tabela: Relatórios
 CREATE TABLE public.relatorios (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   obra_id uuid NOT NULL REFERENCES public.obras(id) ON DELETE CASCADE,
@@ -90,7 +112,7 @@ CREATE TABLE public.relatorios (
   created_at timestamp with time zone DEFAULT now()
 );
 
--- 9. Índices de Performance
+-- 10. Índices de Performance
 CREATE INDEX idx_obras_mestre ON public.obras(mestre_obras_id);
 CREATE INDEX idx_fases_obra ON public.fases(obra_id);
 CREATE INDEX idx_perguntas_fase ON public.perguntas(fase_id);
@@ -98,18 +120,46 @@ CREATE INDEX idx_respostas_obra ON public.respostas(obra_id);
 CREATE INDEX idx_respostas_fase ON public.respostas(fase_id);
 CREATE INDEX idx_alertas_nao_resolvidos ON public.alertas(obra_id) WHERE resolvido = false;
 
--- 10. Funções e Triggers (Cálculo Automático)
-CREATE OR REPLACE FUNCTION atualizar_progresso_fase_obra()
+-- 11. Função e Trigger para Normalização de Respostas
+CREATE OR REPLACE FUNCTION public.normalizar_resposta()
+RETURNS TRIGGER AS $$
+BEGIN
+  NEW.resposta := TRIM(UPPER(NEW.resposta));
+  
+  IF NEW.resposta IN ('NAO', 'NÃO') THEN
+    NEW.resposta := 'NÃO';
+  ELSIF NEW.resposta IN ('SIM') THEN
+    NEW.resposta := 'SIM';
+  ELSIF NEW.resposta IN ('25', '50', '75', '100') THEN
+    NEW.resposta := NEW.resposta || '%';
+  END IF;
+
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_normaliza_resposta
+BEFORE INSERT OR UPDATE ON public.respostas
+FOR EACH ROW
+EXECUTE FUNCTION public.normalizar_resposta();
+
+-- 12. Função e Trigger para Cálculo Automático de Progresso
+CREATE OR REPLACE FUNCTION public.atualizar_progresso_fase_obra()
 RETURNS TRIGGER AS $$
 DECLARE
   v_progresso_fase numeric;
   v_progresso_obra numeric;
 BEGIN
-  -- Calcula progresso da fase (respostas 'SIM' valem 25% cada)
-  SELECT COALESCE(SUM(CASE WHEN resposta = 'SIM' THEN 25 ELSE 0 END), 0)
-  INTO v_progresso_fase
-  FROM public.respostas
-  WHERE fase_id = NEW.fase_id;
+  -- Se for uma resposta direta de porcentagem, assume o valor dela como progresso da fase
+  IF NEW.resposta IN ('25%', '50%', '75%', '100%') THEN
+    v_progresso_fase := REPLACE(NEW.resposta, '%', '')::numeric;
+  ELSE
+    -- Calcula progresso da fase (respostas 'SIM' valem 25% cada)
+    SELECT COALESCE(SUM(CASE WHEN resposta = 'SIM' THEN 25 ELSE 0 END), 0)
+    INTO v_progresso_fase
+    FROM public.respostas
+    WHERE fase_id = NEW.fase_id;
+  END IF;
 
   IF v_progresso_fase > 100 THEN v_progresso_fase := 100; END IF;
   
@@ -151,9 +201,10 @@ $$ LANGUAGE plpgsql;
 CREATE TRIGGER trg_atualiza_progresso
 AFTER INSERT OR UPDATE ON public.respostas
 FOR EACH ROW
-EXECUTE FUNCTION atualizar_progresso_fase_obra();
+EXECUTE FUNCTION public.atualizar_progresso_fase_obra();
 
--- 11. Políticas RLS (Row Level Security)
+-- 13. Segurança RLS (Row Level Security) e Políticas por Tenant (Empresa)
+ALTER TABLE public.tenants ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.usuarios ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.obras ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.fases ENABLE ROW LEVEL SECURITY;
@@ -162,22 +213,45 @@ ALTER TABLE public.respostas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.alertas ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.relatorios ENABLE ROW LEVEL SECURITY;
 
--- Políticas de leitura (Exemplos base)
-CREATE POLICY "Ler perfis" ON public.usuarios FOR SELECT USING (true);
-CREATE POLICY "Ler obras do usuário" ON public.obras FOR SELECT USING (auth.uid() = mestre_obras_id OR auth.uid() = created_by);
-CREATE POLICY "Ler fases da obra acessível" ON public.fases FOR SELECT USING (obra_id IN (SELECT id FROM public.obras WHERE auth.uid() = mestre_obras_id OR auth.uid() = created_by));
-CREATE POLICY "Ler perguntas" ON public.perguntas FOR SELECT USING (true);
-CREATE POLICY "Acesso as respostas" ON public.respostas FOR SELECT USING (true);
-CREATE POLICY "Ler alertas" ON public.alertas FOR SELECT USING (true);
-CREATE POLICY "Ler relatorios" ON public.relatorios FOR SELECT USING (true);
+-- Helper para obter o tenant_id do usuário logado
+CREATE OR REPLACE FUNCTION public.get_user_empresa_id()
+RETURNS uuid AS $$
+  SELECT tenant_id FROM public.usuarios WHERE id = auth.uid();
+$$ LANGUAGE sql SECURITY DEFINER;
 
--- 12. View para Status de Obra (Regra dos 60 dias)
+-- Políticas
+CREATE POLICY "Acesso ao tenant da empresa" ON public.tenants
+  FOR SELECT USING (id = public.get_user_empresa_id());
+
+CREATE POLICY "Isolamento por Empresa - Usuarios" ON public.usuarios
+  FOR ALL USING (id = auth.uid() OR tenant_id = public.get_user_empresa_id());
+
+CREATE POLICY "Isolamento por Empresa - Obras" ON public.obras
+  FOR ALL USING (tenant_id = public.get_user_empresa_id());
+
+CREATE POLICY "Isolamento por Empresa - Fases" ON public.fases
+  FOR ALL USING (obra_id IN (SELECT id FROM public.obras WHERE tenant_id = public.get_user_empresa_id()));
+
+CREATE POLICY "Isolamento por Empresa - Perguntas" ON public.perguntas
+  FOR ALL USING (fase_id IN (SELECT f.id FROM public.fases f JOIN public.obras o ON f.obra_id = o.id WHERE o.tenant_id = public.get_user_empresa_id()));
+
+CREATE POLICY "Isolamento por Empresa - Respostas" ON public.respostas
+  FOR ALL USING (obra_id IN (SELECT id FROM public.obras WHERE tenant_id = public.get_user_empresa_id()));
+
+CREATE POLICY "Isolamento por Empresa - Alertas" ON public.alertas
+  FOR ALL USING (obra_id IN (SELECT id FROM public.obras WHERE tenant_id = public.get_user_empresa_id()));
+
+CREATE POLICY "Isolamento por Empresa - Relatorios" ON public.relatorios
+  FOR ALL USING (obra_id IN (SELECT id FROM public.obras WHERE tenant_id = public.get_user_empresa_id()));
+
+-- 14. View para Status de Obra (Regra dos 60 dias)
 CREATE OR REPLACE VIEW public.vw_status_obras AS
 SELECT 
     o.id,
     o.nome,
     o.data_inicio,
     o.progresso_total,
+    o.tenant_id,
     EXTRACT(DAY FROM (now() - o.data_inicio::timestamp)) as dias_decorridos,
     LEAST(100, ROUND((EXTRACT(DAY FROM (now() - o.data_inicio::timestamp)) / 60.0) * 100, 2)) as progresso_esperado,
     CASE 

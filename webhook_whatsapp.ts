@@ -35,14 +35,21 @@ export async function POST(req: Request) {
     // Extrair apenas o número de telefone (limpar sufixo e non-digits)
     const phone = remoteJid.split('@')[0].replace(/\D/g, '');
 
-    // 1. Validar se a resposta é SIM ou NÃO
+    // 1. Validar se a resposta é SIM, NÃO ou porcentagem (25%, 50%, 75%, 100%)
     const respostaUpper = textMessage.trim().toUpperCase();
-    if (respostaUpper !== 'SIM' && respostaUpper !== 'NÃO' && respostaUpper !== 'NAO') {
-      await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Por favor, responda apenas com SIM ou NÃO.');
+    const regexValida = /^(SIM|NÃO|NAO|25%|50%|75%|100%|25|50|75|100)$/i;
+    
+    if (!regexValida.test(respostaUpper)) {
+      await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Por favor, responda com SIM, NÃO ou uma porcentagem de progresso (25%, 50%, 75% ou 100%).');
       return NextResponse.json({ message: 'Resposta inválida solicitada novamente' }, { status: 200 });
     }
 
-    const respostaFinal = respostaUpper === 'NAO' ? 'NÃO' : respostaUpper;
+    let respostaFinal = respostaUpper;
+    if (respostaFinal === 'NAO') {
+      respostaFinal = 'NÃO';
+    } else if (['25', '50', '75', '100'].includes(respostaFinal)) {
+      respostaFinal = `${respostaFinal}%`;
+    }
 
     // 2. Identificar o Mestre de Obras pelo telefone
     // Supondo que o telefone no BD esteja cadastrado no formato parecido (ou aplicar %LIKE%)
@@ -147,7 +154,7 @@ export async function POST(req: Request) {
     const temProximaPergunta = faseAtual.perguntas.find((p: any) => p.id !== perguntaPendente.id && !respondidasIds.includes(p.id));
     
     if (temProximaPergunta) {
-      await enviarMensagemWhatsApp(remoteJid, `Anotado!\n\nAgora a 2ª pergunta:\n${temProximaPergunta.texto_pergunta}\n\nResponda SIM ou NÃO.`);
+      await enviarMensagemWhatsApp(remoteJid, `Anotado!\n\nAgora a 2ª pergunta:\n${temProximaPergunta.texto_pergunta}\n\nResponda com SIM, NÃO ou uma porcentagem (25%, 50%, 75% ou 100%).`);
     } else {
       await enviarMensagemWhatsApp(remoteJid, `Perfeito, ${usuario.nome}. Respostas da semana registradas com sucesso. Bom trabalho na obra ${obraFase.nome}!`);
     }
