@@ -1,0 +1,169 @@
+{
+  "name": "SaaS Obras - Automação Completa (WhatsApp + Supabase)",
+  "nodes": [
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 16 * * 5"
+            }
+          ]
+        }
+      },
+      "id": "cron_trigger",
+      "name": "Toda Sexta às 16h",
+      "type": "n8n-nodes-base.cron",
+      "typeVersion": 1,
+      "position": [ 0, 0 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "SELECT o.id as obra_id, o.nome as obra_nome, u.nome as mestre_nome, u.telefone, f.id as fase_id, f.nome as fase_nome, p.id as pergunta_id, p.texto_pergunta FROM public.obras o JOIN public.usuarios u ON o.mestre_obras_id = u.id JOIN public.fases f ON f.obra_id = o.id JOIN public.perguntas p ON p.fase_id = f.id WHERE o.status = 'ativa' AND f.status != 'concluida' AND p.ordem = 1 AND NOT EXISTS (SELECT 1 FROM public.respostas r WHERE r.pergunta_id = p.id AND r.obra_id = o.id) LIMIT 50;"
+      },
+      "id": "supabase_get_questions",
+      "name": "Supabase - Buscar Perguntas",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [ 200, 0 ],
+      "credentials": {
+        "supabaseApi": { "id": "SUA_CREDENCIAL_ID" }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "number", "value": "={{ $json.telefone }}" },
+            { "name": "text", "value": "Olá {{ $json.mestre_nome }}! 👷‍♂️\nObra: {{ $json.obra_nome }}\nFase: {{ $json.fase_nome }}\n\nPergunta:\n{{ $json.texto_pergunta }}\n\nResponda apenas com *SIM* ou *NÃO*." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "evolution_send_first",
+      "name": "Evolution - Enviar Pergunta",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 400, 0 ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "whatsapp-webhook",
+        "options": {}
+      },
+      "id": "webhook_receiver",
+      "name": "Webhook - Receber Resposta",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1,
+      "position": [ 0, 250 ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "string": [
+            {
+              "value1": "={{ $json.body.data.message.conversation || $json.body.data.message.extendedTextMessage.text }}",
+              "operation": "regex",
+              "value2": "/^(SIM|NÃO|NAO)$/i"
+            }
+          ]
+        }
+      },
+      "id": "validate_response",
+      "name": "Validar Resposta?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [ 220, 250 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [ { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" } ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "number", "value": "={{ $json.body.data.key.remoteJid }}" },
+            { "name": "text", "value": "⚠️ Resposta inválida. Por favor, responda apenas com *SIM* ou *NÃO*." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "evolution_invalid",
+      "name": "Evolution - Erro Formato",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 400, 450 ]
+    },
+    {
+      "parameters": {
+        "operation": "executeQuery",
+        "query": "WITH user_info AS (SELECT id, nome FROM public.usuarios WHERE telefone LIKE '%' || RIGHT('{{ $json.body.data.key.remoteJid.split('@')[0] }}', 8) LIMIT 1) INSERT INTO public.respostas (obra_id, fase_id, pergunta_id, resposta, usuario_responsavel) SELECT f.obra_id, f.id, p.id, UPPER('{{ ($json.body.data.message.conversation || $json.body.data.message.extendedTextMessage.text).replace('NAO', 'NÃO') }}'), (SELECT id FROM user_info) FROM public.fases f JOIN public.perguntas p ON p.fase_id = f.id WHERE f.obra_id IN (SELECT id FROM public.obras WHERE mestre_obras_id = (SELECT id FROM user_info)) AND f.status != 'concluida' AND NOT EXISTS (SELECT 1 FROM public.respostas r WHERE r.pergunta_id = p.id) ORDER BY f.ordem ASC, p.ordem ASC LIMIT 1 RETURNING id;"
+      },
+      "id": "supabase_insert_answer",
+      "name": "Supabase - Salvar Resposta",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [ 450, 250 ],
+      "credentials": { "supabaseApi": { "id": "SUA_CREDENCIAL_ID" } }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.EVOLUTION_API_URL }}/message/sendText/{{ $env.EVOLUTION_INSTANCE }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [ { "name": "apikey", "value": "={{ $env.EVOLUTION_API_KEY }}" } ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": [
+            { "name": "number", "value": "={{ $node['Webhook - Receber Resposta'].json.body.data.key.remoteJid }}" },
+            { "name": "text", "value": "✅ Resposta registrada! Obrigado pela colaboração." }
+          ]
+        },
+        "options": {}
+      },
+      "id": "evolution_confirm",
+      "name": "Evolution - Confirmação",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 680, 250 ]
+    }
+  ],
+  "connections": {
+    "Toda Sexta às 16h": {
+      "main": [ [ { "node": "Supabase - Buscar Perguntas", "type": "main", "index": 0 } ] ]
+    },
+    "Supabase - Buscar Perguntas": {
+      "main": [ [ { "node": "Evolution - Enviar Pergunta", "type": "main", "index": 0 } ] ]
+    },
+    "Webhook - Receber Resposta": {
+      "main": [ [ { "node": "Validar Resposta?", "type": "main", "index": 0 } ] ]
+    },
+    "Validar Resposta?": {
+      "main": [
+        [ { "node": "Supabase - Salvar Resposta", "type": "main", "index": 0 } ],
+        [ { "node": "Evolution - Erro Formato", "type": "main", "index": 0 } ]
+      ]
+    },
+    "Supabase - Salvar Resposta": {
+      "main": [ [ { "node": "Evolution - Confirmação", "type": "main", "index": 0 } ] ]
+    }
+  }
+}
