@@ -216,7 +216,7 @@ export default function ObrasPage() {
           cliente: editingObra.cliente ? editingObra.cliente.trim() : null,
           manager_name: editingObra.responsavel.trim(),
           manager_phone: editingObra.telefone.replace(/\D/g, ''),
-          status: editingObra.status,
+          status: editingObra.status === 'atrasada' ? 'ativa' : editingObra.status,
           data_inicio: editingObra.data_inicio,
           data_entrega_prevista: editingObra.data_entrega_prevista,
           custom_greeting: editingObra.saudacao ? editingObra.saudacao.trim() : null,

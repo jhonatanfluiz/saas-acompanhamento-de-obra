@@ -20,7 +20,7 @@ export default function FasesPage() {
   // 1. Fetch Obras
   useEffect(() => {
     async function fetchObras() {
-      const { data } = await supabase.from('obras').select('id, nome').eq('status', 'ativa').order('created_at', { ascending: false });
+      const { data } = await supabase.from('obras').select('id, nome').in('status', ['ativa', 'atrasada']).order('created_at', { ascending: false });
       setObras(data || []);
       if (data && data.length > 0) {
         setSelectedObraId(data[0].id);

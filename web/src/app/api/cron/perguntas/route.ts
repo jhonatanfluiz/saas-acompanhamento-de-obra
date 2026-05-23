@@ -91,7 +91,7 @@ export async function GET(req: Request) {
           )
         )
       `)
-      .eq('status', 'ativa');
+      .in('status', ['ativa', 'atrasada']);
 
     if (obraId) {
       dbQuery = dbQuery.eq('id', obraId);

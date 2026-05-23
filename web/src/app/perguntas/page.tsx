@@ -110,7 +110,7 @@ export default function PerguntasPage() {
         const { data, error: err } = await supabase
           .from('obras')
           .select('id, nome, manager_name, manager_phone')
-          .eq('status', 'ativa')
+          .in('status', ['ativa', 'atrasada'])
           .order('nome');
 
         if (err) throw err;

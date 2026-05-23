@@ -73,11 +73,11 @@ function DashboardContent() {
   // ─── Função de fetch centralizada (usada tanto no mount quanto no Realtime) ──
   const fetchData = useCallback(async () => {
     // 1. Métricas Básicas
-    let obrasQuery = supabase.from('obras').select('*', { count: 'exact', head: true }).eq('status', 'ativa');
+    let obrasQuery = supabase.from('obras').select('*', { count: 'exact', head: true }).in('status', ['ativa', 'atrasada']);
     let concluidasQuery = supabase.from('obras').select('*', { count: 'exact', head: true }).eq('status', 'concluida');
     let alertasQuery = supabase.from('alertas').select('*, obras!inner(nome)', { count: 'exact', head: true }).eq('resolvido', false);
 
-    let worksListQuery = supabase.from('obras').select('*, fases(*)').eq('status', 'ativa').order('created_at', { ascending: false }).limit(20);
+    let worksListQuery = supabase.from('obras').select('*, fases(*)').in('status', ['ativa', 'atrasada']).order('created_at', { ascending: false }).limit(20);
     let alertsListQuery = supabase.from('alertas').select('*, obras!inner(nome)').order('created_at', { ascending: false }).limit(5);
 
     if (query) {

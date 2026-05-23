@@ -82,7 +82,7 @@ export async function GET(req: Request) {
           )
         )
       `)
-      .eq('status', 'ativa');
+      .in('status', ['ativa', 'atrasada']);
 
     if (restrictionObraId) {
       dbQuery = dbQuery.eq('id', restrictionObraId);
