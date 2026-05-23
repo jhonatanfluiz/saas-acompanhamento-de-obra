@@ -1,10 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, User, Search, Settings, UserPlus } from 'lucide-react';
+import { Bell, User, Search, Settings, UserPlus, Menu } from 'lucide-react';
 import { useRouter, useSearchParams } from 'next/navigation';
 
-export default function Header() {
+export default function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const router = useRouter();
   const searchParams = useSearchParams();
   const [searchQuery, setSearchQuery] = useState(searchParams.get('q') || '');
@@ -50,6 +50,13 @@ export default function Header() {
     <header className="fixed top-0 z-30 w-full border-b border-slate-200 bg-white/80 backdrop-blur-md lg:pl-64">
       <div className="flex h-16 items-center justify-between px-4 lg:px-8">
         <div className="flex flex-1 items-center">
+          <button
+            onClick={onMenuClick}
+            aria-label="Abrir Menu"
+            className="mr-3 rounded-lg p-2 text-slate-500 hover:bg-slate-100 hover:text-slate-900 lg:hidden"
+          >
+            <Menu className="h-5 w-5" />
+          </button>
           <div className="relative w-full max-w-md lg:max-w-xs">
             <button 
               onClick={applySearch}
