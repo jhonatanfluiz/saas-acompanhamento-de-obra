@@ -1,47 +1,178 @@
 import { describe, it, expect } from 'vitest'
 
-export function calculatePhaseProgress(answers: string[]): number {
-  if (answers.length === 0) return 0;
-  const lastAnswer = answers[answers.length - 1].toUpperCase();
-  if (lastAnswer.endsWith('%')) {
-    const val = parseInt(lastAnswer.replace('%', ''), 10);
-    return isNaN(val) ? 0 : val;
-  }
-  const simCount = answers.filter(a => a.toUpperCase() === 'SIM').length;
-  // Cada SIM vale 25% (máximo de 4 perguntas)
-  return Math.min(100, simCount * 25);
+interface PerguntaDeTeste {
+  ordem: number;
+  peso: number;
+  resposta: string | null;
 }
 
-describe('Lógica de Progresso da Fase (25% por pergunta ou resposta de porcentagem direta)', () => {
-  it('deve calcular 0% se não houver respostas SIM', () => {
-    expect(calculatePhaseProgress(['NÃO', 'NÃO', 'NÃO', 'NÃO'])).toBe(0)
+export function calculatePhaseProgress(perguntas: PerguntaDeTeste[]): number {
+  const v_num_perguntas = perguntas.length;
+
+  if (v_num_perguntas === 2) {
+    // Lógica clássica (2 perguntas)
+    const r1 = perguntas[0].resposta ? perguntas[0].resposta.trim().toUpperCase() : null;
+    const r2 = perguntas[1].resposta ? perguntas[1].resposta.trim().toUpperCase() : null;
+
+    if (r1 === 'NÃO' || r1 === 'N/A' || r1 === 'NAO') {
+      return 0;
+    }
+    if (r1 === 'SIM') {
+      if (r2 !== null && r2 !== undefined) {
+        const match = r2.match(/\d+/);
+        return match ? parseInt(match[0], 10) : 0;
+      }
+      return 0;
+    }
+    return 0;
+  }
+
+  // Lógica ponderada (Prompt 3)
+  let somaPesosSim = 0;
+  let somaPesosTotal = 0;
+
+  for (const p of perguntas) {
+    const resp = p.resposta ? p.resposta.trim().toUpperCase() : null;
+    if (resp !== 'N/A') {
+      somaPesosTotal += p.peso;
+      if (resp === 'SIM') {
+        somaPesosSim += p.peso;
+      }
+    }
+  }
+
+  if (somaPesosTotal > 0) {
+    return Math.round((somaPesosSim / somaPesosTotal) * 10000) / 100;
+  } else {
+    // Se tudo for N/A, considera concluída (100%)
+    const totalNa = perguntas.filter(p => p.resposta?.trim().toUpperCase() === 'N/A').length;
+    return totalNa > 0 ? 100.0 : 0.0;
+  }
+}
+
+describe('Lógica de Progresso da Fase (Fórmula Elevadores - 2 Perguntas)', () => {
+  it('deve calcular 0% se Pergunta 1 for NÃO', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'NÃO' },
+      { ordem: 2, peso: 1, resposta: null }
+    ])).toBe(0)
+    
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'NÃO' },
+      { ordem: 2, peso: 1, resposta: '50%' }
+    ])).toBe(0)
   })
 
-  it('deve calcular 25% com uma resposta SIM', () => {
-    expect(calculatePhaseProgress(['SIM', 'NÃO', 'NÃO', 'NÃO'])).toBe(25)
+  it('deve calcular 0% se Pergunta 1 for N/A', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'N/A' },
+      { ordem: 2, peso: 1, resposta: null }
+    ])).toBe(0)
   })
 
-  it('deve calcular 50% com duas respostas SIM', () => {
-    expect(calculatePhaseProgress(['SIM', 'SIM', 'NÃO', 'NÃO'])).toBe(50)
+  it('deve calcular 0% se Pergunta 1 for SIM mas Pergunta 2 for nula', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 1, resposta: null }
+    ])).toBe(0)
   })
 
-  it('deve calcular 75% com três respostas SIM', () => {
-    expect(calculatePhaseProgress(['SIM', 'SIM', 'SIM', 'NÃO'])).toBe(75)
+  it('deve calcular progresso com base na Pergunta 2 se Pergunta 1 for SIM', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 1, resposta: '25%' }
+    ])).toBe(25)
+
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 1, resposta: '100%' }
+    ])).toBe(100)
   })
 
-  it('deve calcular 100% com quatro respostas SIM', () => {
-    expect(calculatePhaseProgress(['SIM', 'SIM', 'SIM', 'SIM'])).toBe(100)
+  it('deve normalizar valores sem símbolo de porcentagem', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 1, resposta: '50' }
+    ])).toBe(50)
+  })
+})
+
+describe('Lógica de Progresso Ponderado da Fase (Prompt 3 - Multietapas)', () => {
+  it('deve calcular 0% se todas as respostas forem NÃO', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'NÃO' },
+      { ordem: 2, peso: 2, resposta: 'NÃO' },
+      { ordem: 3, peso: 3, resposta: 'NÃO' }
+    ])).toBe(0)
   })
 
-  it('deve usar a porcentagem direta de 50% se for a última resposta', () => {
-    expect(calculatePhaseProgress(['SIM', '50%'])).toBe(50)
+  it('deve calcular 100% se todas as respostas forem SIM', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 2, resposta: 'SIM' },
+      { ordem: 3, peso: 3, resposta: 'SIM' }
+    ])).toBe(100)
   })
 
-  it('deve usar a porcentagem direta de 100% se for a última resposta', () => {
-    expect(calculatePhaseProgress(['NÃO', '100%'])).toBe(100)
+  it('deve ponderar as respostas SIM de acordo com seus pesos', () => {
+    // Q1(peso 1): SIM, Q2(peso 2): NÃO, Q3(peso 3): NÃO
+    // total = 6, sim = 1 -> 16.67%
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 2, resposta: 'NÃO' },
+      { ordem: 3, peso: 3, resposta: 'NÃO' }
+    ])).toBe(16.67)
+
+    // Q1(peso 1): NÃO, Q2(peso 2): SIM, Q3(peso 3): NÃO
+    // total = 6, sim = 2 -> 33.33%
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'NÃO' },
+      { ordem: 2, peso: 2, resposta: 'SIM' },
+      { ordem: 3, peso: 3, resposta: 'NÃO' }
+    ])).toBe(33.33)
+
+    // Q1(peso 1): SIM, Q2(peso 2): SIM, Q3(peso 3): NÃO
+    // total = 6, sim = 3 -> 50%
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 2, resposta: 'SIM' },
+      { ordem: 3, peso: 3, resposta: 'NÃO' }
+    ])).toBe(50)
   })
 
-  it('deve usar a porcentagem direta de 75% se for a última resposta', () => {
-    expect(calculatePhaseProgress(['75%'])).toBe(75)
+  it('deve excluir do cálculo (tanto do dividendo quanto do divisor) as perguntas respondidas com N/A', () => {
+    // Q1(peso 1): SIM, Q2(peso 2): N/A, Q3(peso 3): NÃO
+    // total = 1 + 3 = 4, sim = 1 -> 25%
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 2, resposta: 'N/A' },
+      { ordem: 3, peso: 3, resposta: 'NÃO' }
+    ])).toBe(25)
+
+    // Q1(peso 1): N/A, Q2(peso 2): SIM, Q3(peso 3): N/A
+    // total = 2, sim = 2 -> 100%
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'N/A' },
+      { ordem: 2, peso: 2, resposta: 'SIM' },
+      { ordem: 3, peso: 3, resposta: 'N/A' }
+    ])).toBe(100)
+  })
+
+  it('deve considerar 100% se todas as perguntas forem N/A', () => {
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'N/A' },
+      { ordem: 2, peso: 2, resposta: 'N/A' },
+      { ordem: 3, peso: 3, resposta: 'N/A' }
+    ])).toBe(100)
+  })
+
+  it('deve considerar perguntas não respondidas (null) no divisor mas não no dividendo', () => {
+    // Q1(peso 1): SIM, Q2(peso 2): null, Q3(peso 3): null
+    // total = 6, sim = 1 -> 16.67%
+    expect(calculatePhaseProgress([
+      { ordem: 1, peso: 1, resposta: 'SIM' },
+      { ordem: 2, peso: 2, resposta: null },
+      { ordem: 3, peso: 3, resposta: null }
+    ])).toBe(16.67)
   })
 })

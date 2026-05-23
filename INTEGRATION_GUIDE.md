@@ -12,7 +12,7 @@ A arquitetura de integração de mensagens opera de forma cíclica e reativa:
 graph TD
     A[n8n / Cron Job] -- 1. Dispara envio de pergunta --> B[Evolution API]
     B -- 2. Envia mensagem via WhatsApp --> C[Mestre de Obras / Encarregado]
-    C -- 3. Responde (SIM, NÃO, 50%) --> B
+    C -- 3. Responde (SIM, NÃO, N/A) --> B
     B -- 4. Encaminha evento messages.upsert --> D[Webhook Next.js API]
     D -- 5. Valida e normaliza resposta --> E[Supabase DB]
     E -- 6. Trigger recalcula progresso da fase/obra --> F[Dashboard Atualizado em Tempo Real]
@@ -97,7 +97,7 @@ Para disparar mensagens de forma ativa (ex: através do cron job semanal):
 ```json
 {
   "number": "5511999999999",
-  "text": "Olá Mestre! Como está a fase de Instalação de Trilhos?\n\nResponda com SIM, NÃO ou o avanço estimado (25%, 50%, 75% ou 100%)."
+  "text": "Olá Mestre! Como está a fase de Instalação de Trilhos?\n\nResponda apenas com SIM, NÃO ou N/A."
 }
 ```
 
@@ -129,7 +129,7 @@ O arquivo `n8n_full_automation.json` na raiz contém a especificação pronta de
 2. **Supabase - Buscar Perguntas**: Executa uma query SQL buscando obras ativas, seus encarregados (telefones) e a pergunta pendente atual.
 3. **Evolution - Enviar Pergunta**: Dispara a mensagem formatada para o número do WhatsApp retornado.
 4. **Webhook - Receber Resposta**: Aguarda respostas do WhatsApp enviadas pela Evolution API.
-5. **Validar Resposta**: Filtra as respostas garantindo que correspondam a `SIM`, `NÃO`, ou porcentagens (`25`, `50`, `75`, `100`, `25%`, `50%`, `75%`, `100%`).
+5. **Validar Resposta**: Filtra as respostas garantindo que correspondam a `SIM`, `NÃO`, ou `N/A`.
 6. **Supabase - Salvar Resposta**: Registra a resposta no Supabase. O trigger do banco cuida de normalizar os dados e atualizar o progresso da obra de forma reativa.
 
 ---
@@ -148,6 +148,20 @@ O sistema está estruturado em um modelo robusto de multi-tenancy a nível de ba
 
 ## 8. Tratamento de Erros, Logs e Produção
 
-* **Normalização Resiliente**: O trigger `trg_normaliza_resposta` no Postgres trata variações comuns como `nao`, `NAO`, `50`, `50 %` para salvar de forma padronizada (`NÃO`, `50%`), prevenindo erros humanos de digitação por parte do encarregado.
+* **Normalização Resiliente**: O trigger `trg_normaliza_resposta` no Postgres trata variações comuns como `nao`, `NAO`, `na`, `NA` para salvar de forma padronizada (`NÃO`, `N/A`), prevenindo erros humanos de digitação por parte do encarregado.
 * **Resiliência a API Indisponível**: Caso a Evolution API fique offline temporariamente, as rotas de webhook capturam a falha e registram avisos em logs sem derrubar o Next.js ou o n8n.
 * **Segurança do Cron**: A rota `/api/cron/perguntas` é protegida com uma chave no parâmetro de URL ou cabeçalho `Authorization` correspondente à variável `CRON_SECRET`, impedindo execuções maliciosas.
+
+---
+
+## 9. Integração com Dashboards Google (Google Sheets & Looker Studio)
+
+Para disponibilizar painéis gerenciais avançados com custo operacional zero:
+
+1. **Sincronização com Planilhas**:
+   - Um nó de integração do **Google Sheets** é configurado no n8n após o salvamento no Supabase (ou um script programado em Next.js realiza a exportação semanal).
+   - Cada inserção de resposta gera uma linha na planilha contendo: `Data`, `Construtora`, `Obra`, `Fase`, `Pergunta`, `Resposta (SIM/NÃO/N/A)` e `Responsável`.
+2. **Conexão com Google Looker Studio**:
+   - O gestor cria um relatório em [Google Looker Studio](https://lookerstudio.google.com).
+   - Adiciona a planilha sincronizada do Google Sheets como fonte de dados.
+   - Monta gráficos dinâmicos de pizza (distribuição de respostas), de barras (progresso por fase) e alertas visuais de atraso (quando resposta for `NÃO`).

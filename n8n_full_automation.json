@@ -46,7 +46,7 @@
         "bodyParameters": {
           "parameters": [
             { "name": "number", "value": "={{ $json.telefone }}" },
-            { "name": "text", "value": "Olá {{ $json.mestre_nome }}! 👷‍♂️\nObra: {{ $json.obra_nome }}\nFase: {{ $json.fase_nome }}\n\nPergunta:\n{{ $json.texto_pergunta }}\n\nResponda com *SIM*, *NÃO* ou com a porcentagem de avanço (*25%*, *50%*, *75%*, *100%*)." }
+            { "name": "text", "value": "Olá {{ $json.mestre_nome }}! 👷‍♂️\nObra: {{ $json.obra_nome }}\nFase: {{ $json.fase_nome }}\n\nPergunta:\n👉 *{{ $json.texto_pergunta }}*\n\nResponda apenas com *SIM*, *NÃO* ou *N/A*." }
           ]
         },
         "options": {}
@@ -76,7 +76,7 @@
             {
               "value1": "={{ $json.body.data.message.conversation || $json.body.data.message.extendedTextMessage.text }}",
               "operation": "regex",
-              "value2": "/^(SIM|NÃO|NAO|25%|50%|75%|100%|25|50|75|100)$/i"
+              "value2": "/^(SIM|NÃO|NAO|N\\/A|NA)$/i"
             }
           ]
         }
@@ -99,7 +99,7 @@
         "bodyParameters": {
           "parameters": [
             { "name": "number", "value": "={{ $json.body.data.key.remoteJid }}" },
-            { "name": "text", "value": "⚠️ Resposta inválida. Por favor, responda com *SIM*, *NÃO* ou o progresso estimado (*25%*, *50%*, *75%*, *100%*)." }
+            { "name": "text", "value": "⚠️ Resposta inválida. Por favor, responda apenas com *SIM*, *NÃO* ou *N/A*." }
           ]
         },
         "options": {}
@@ -144,6 +144,29 @@
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.1,
       "position": [ 680, 250 ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $env.NEXT_PUBLIC_SITE_URL }}/api/sync/google-sheets",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "Authorization", "value": "=Bearer {{ $env.CRON_SECRET }}" },
+            { "name": "Content-Type", "value": "application/json" }
+          ]
+        },
+        "sendBody": true,
+        "bodyParameters": {
+          "parameters": []
+        },
+        "options": {}
+      },
+      "id": "sync_google_sheets",
+      "name": "Google Sheets - Sincronizar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.1,
+      "position": [ 900, 250 ]
     }
   ],
   "connections": {
@@ -163,7 +186,10 @@
       ]
     },
     "Supabase - Salvar Resposta": {
-      "main": [ [ { "node": "Evolution - Confirmação", "type": "main", "index": 0 } ] ]
+      "main": [
+        [ { "node": "Evolution - Confirmação", "type": "main", "index": 0 } ],
+        [ { "node": "Google Sheets - Sincronizar", "type": "main", "index": 0 } ]
+      ]
     }
   }
 }

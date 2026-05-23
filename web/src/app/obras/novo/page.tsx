@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   ChevronLeft,
   Save,
@@ -13,6 +13,7 @@ import {
   CheckCircle2,
   AlertCircle,
   Sparkles,
+  ArrowLeft,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -26,6 +27,7 @@ interface FormData {
   data_inicio: string;
   data_entrega: string;
   saudacao: string;
+  checklist_id: string | null;
 }
 
 const initialForm: FormData = {
@@ -36,6 +38,7 @@ const initialForm: FormData = {
   data_inicio: '',
   data_entrega: '',
   saudacao: 'Bom dia [nome]. Como está o avanço da obra [obra]?',
+  checklist_id: null,
 };
 
 export default function NovaObraPage() {
@@ -44,9 +47,66 @@ export default function NovaObraPage() {
   const [success, setSuccess] = useState(false);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
   const [formData, setFormData] = useState<FormData>(initialForm);
+  interface ChecklistOption {
+    id: string;
+    nome: string;
+    fases_count: number;
+    perguntas_count: number;
+  }
+
+  const [checklists, setChecklists] = useState<ChecklistOption[]>([]);
+
+  useEffect(() => {
+    const fetchChecklists = async () => {
+      try {
+        const { data, error } = await supabase
+          .from('checklists')
+          .select(`
+            id,
+            nome,
+            checklist_fases (
+              id,
+              checklist_perguntas (
+                id
+              )
+            )
+          `)
+          .order('nome');
+        if (error) throw error;
+        if (data) {
+          const formatted = data.map((item: any) => {
+            const fases_count = item.checklist_fases?.length || 0;
+            const perguntas_count = item.checklist_fases?.reduce(
+              (acc: number, fase: any) => acc + (fase.checklist_perguntas?.length || 0),
+              0
+            ) || 0;
+            return {
+              id: item.id,
+              nome: item.nome,
+              fases_count,
+              perguntas_count,
+            };
+          });
+          setChecklists(formatted);
+        }
+      } catch (err) {
+        console.error('Erro ao carregar checklists:', err);
+      }
+    };
+    fetchChecklists();
+  }, []);
 
   const updateField = (field: keyof FormData) => (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    setFormData((prev) => ({ ...prev, [field]: e.target.value }));
+    const value = e.target.value;
+    setFormData((prev) => {
+      const next = { ...prev, [field]: value };
+      if (field === 'data_inicio' && value) {
+        const date = new Date(value + 'T12:00:00');
+        date.setDate(date.getDate() + 60);
+        next.data_entrega = date.toISOString().split('T')[0];
+      }
+      return next;
+    });
     setErrorMsg(null);
   };
 
@@ -60,9 +120,6 @@ export default function NovaObraPage() {
     if (!formData.mestre_phone.trim()) return setErrorMsg('O WhatsApp do mestre é obrigatório.');
     if (!formData.data_inicio) return setErrorMsg('A data de início é obrigatória.');
     if (!formData.data_entrega) return setErrorMsg('A data de entrega prevista é obrigatória.');
-    if (formData.data_entrega <= formData.data_inicio) {
-      return setErrorMsg('A data de entrega deve ser posterior à data de início.');
-    }
 
     setLoading(true);
 
@@ -74,6 +131,7 @@ export default function NovaObraPage() {
         p_saudacao: formData.saudacao.trim(),
         p_data_inicio: formData.data_inicio,
         p_data_entrega: formData.data_entrega,
+        p_checklist_id: formData.checklist_id || null,
       });
 
       if (error) throw error;
@@ -96,8 +154,7 @@ export default function NovaObraPage() {
         </div>
         <h2 className="text-2xl font-bold text-slate-900">Obra criada com sucesso!</h2>
         <p className="text-slate-500">
-          As <span className="font-semibold text-emerald-600">20 fases</span> e{' '}
-          <span className="font-semibold text-emerald-600">40 perguntas</span> foram configuradas automaticamente.
+          As fases e perguntas da obra foram configuradas com base no checklist selecionado.
           Redirecionando para a lista de obras...
         </p>
         <div className="h-1.5 w-full rounded-full bg-slate-100 overflow-hidden">
@@ -106,6 +163,13 @@ export default function NovaObraPage() {
       </div>
     );
   }
+  const selectedChecklist = checklists.find(c => c.id === formData.checklist_id);
+  const totalFasesStr = selectedChecklist 
+    ? `${selectedChecklist.fases_count} fases` 
+    : '20 fases de montagem';
+  const totalPerguntasStr = selectedChecklist 
+    ? `${selectedChecklist.perguntas_count} perguntas` 
+    : '40 perguntas';
 
   return (
     <div className="mx-auto max-w-3xl space-y-6 pb-16">
@@ -113,28 +177,33 @@ export default function NovaObraPage() {
       <div className="flex items-center justify-between">
         <Link
           href="/obras"
-          className="flex items-center gap-1.5 text-sm font-medium text-slate-500 hover:text-emerald-600 transition-colors"
+          className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors mb-2"
         >
-          <ChevronLeft className="h-4 w-4" />
+          <ArrowLeft size={16} />
           Voltar para Obras
         </Link>
       </div>
 
       {/* Hero do formulário */}
-      <div className="rounded-3xl bg-gradient-to-br from-emerald-600 to-emerald-700 p-8 text-white shadow-xl shadow-emerald-200">
+      <div className="rounded-3xl bg-gradient-to-br from-indigo-600 to-indigo-700 p-8 text-white shadow-xl shadow-indigo-200">
         <div className="flex items-center gap-3 mb-2">
-          <Sparkles className="h-5 w-5 text-emerald-300" />
-          <span className="text-sm font-semibold text-emerald-200 uppercase tracking-wider">Nova Obra</span>
+          <Sparkles className="h-5 w-5 text-indigo-300" />
+          <span className="text-sm font-semibold text-indigo-200 uppercase tracking-wider">Nova Obra</span>
         </div>
         <h1 className="text-3xl font-bold">Cadastrar Nova Obra</h1>
-        <p className="mt-2 text-emerald-100 text-sm max-w-md">
+        <p className="mt-2 text-indigo-100 text-sm max-w-md">
           Preencha os dados abaixo. O sistema criará automaticamente as{' '}
-          <strong>20 fases de montagem</strong> e <strong>40 perguntas</strong> de acompanhamento.
+          <strong>{totalFasesStr}</strong> e <strong>{totalPerguntasStr}</strong> de acompanhamento.
         </p>
 
         {/* Chips de resumo */}
         <div className="mt-5 flex flex-wrap gap-2">
-          {['20 Fases automáticas', '40 Perguntas configuradas', 'Rastreio de 60 dias', 'WhatsApp integrado'].map((chip) => (
+          {[
+            selectedChecklist ? `${selectedChecklist.fases_count} Fases automáticas` : '20 Fases automáticas',
+            selectedChecklist ? `${selectedChecklist.perguntas_count} Perguntas configuradas` : '40 Perguntas configuradas',
+            'Rastreio de 60 dias',
+            'WhatsApp integrado'
+          ].map((chip) => (
             <span key={chip} className="rounded-full bg-white/20 px-3 py-1 text-xs font-semibold text-white backdrop-blur-sm">
               ✓ {chip}
             </span>
@@ -148,7 +217,7 @@ export default function NovaObraPage() {
         {/* Seção: Identificação da Obra */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2 mb-1">
-            <Building2 className="h-5 w-5 text-emerald-600" />
+            <Building2 className="h-5 w-5 text-indigo-600" />
             <h2 className="text-base font-bold text-slate-900">Identificação da Obra</h2>
           </div>
 
@@ -161,7 +230,7 @@ export default function NovaObraPage() {
               value={formData.nome}
               onChange={updateField('nome')}
               placeholder="Ex: Residencial Jardins da Serra"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
           </div>
 
@@ -174,15 +243,36 @@ export default function NovaObraPage() {
               value={formData.cliente}
               onChange={updateField('cliente')}
               placeholder="Nome da construtora ou pessoa física"
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
             />
+          </div>
+
+          <div>
+            <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+              Template de Checklist
+            </label>
+            <select
+              value={formData.checklist_id || ''}
+              onChange={(e) => setFormData(prev => ({ ...prev, checklist_id: e.target.value || null }))}
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
+            >
+              <option value="">Montagem Padrão de Elevadores (20 fases - Padrão do Sistema)</option>
+              {checklists.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.nome}
+                </option>
+              ))}
+            </select>
+            <p className="mt-1 text-xs text-slate-400">
+              Selecione um checklist customizado ou mantenha o padrão com as 20 fases clássicas de elevadores.
+            </p>
           </div>
         </div>
 
         {/* Seção: Mestre de Obras */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2 mb-1">
-            <User className="h-5 w-5 text-emerald-600" />
+            <User className="h-5 w-5 text-indigo-600" />
             <h2 className="text-base font-bold text-slate-900">Responsável / Mestre de Obras</h2>
           </div>
 
@@ -196,7 +286,7 @@ export default function NovaObraPage() {
                 value={formData.mestre_nome}
                 onChange={updateField('mestre_nome')}
                 placeholder="Nome completo"
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
               />
             </div>
 
@@ -211,7 +301,7 @@ export default function NovaObraPage() {
                   value={formData.mestre_phone}
                   onChange={updateField('mestre_phone')}
                   placeholder="55 11 99999-0000"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 py-3 pl-10 pr-4 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
                 />
               </div>
               <p className="mt-1 text-xs text-slate-400">Inclua o código do país: 55 11 9...</p>
@@ -222,7 +312,7 @@ export default function NovaObraPage() {
         {/* Seção: Cronograma */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2 mb-1">
-            <CalendarDays className="h-5 w-5 text-emerald-600" />
+            <CalendarDays className="h-5 w-5 text-indigo-600" />
             <h2 className="text-base font-bold text-slate-900">Cronograma</h2>
           </div>
 
@@ -235,19 +325,19 @@ export default function NovaObraPage() {
                 type="date"
                 value={formData.data_inicio}
                 onChange={updateField('data_inicio')}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all"
               />
             </div>
 
             <div>
               <label className="block text-sm font-semibold text-slate-700 mb-1.5">
-                Entrega Prevista <span className="text-red-500">*</span>
+                Entrega Prevista (60 dias padrão) <span className="text-red-500">*</span>
               </label>
               <input
                 type="date"
                 value={formData.data_entrega}
-                onChange={updateField('data_entrega')}
-                className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all"
+                readOnly
+                className="w-full rounded-xl border border-slate-200 bg-slate-100 px-4 py-3 text-sm text-slate-500 cursor-not-allowed focus:outline-none transition-all"
               />
             </div>
           </div>
@@ -270,7 +360,7 @@ export default function NovaObraPage() {
         {/* Seção: Mensagem WhatsApp */}
         <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm space-y-5">
           <div className="flex items-center gap-2 mb-1">
-            <MessageSquare className="h-5 w-5 text-emerald-600" />
+            <MessageSquare className="h-5 w-5 text-indigo-600" />
             <h2 className="text-base font-bold text-slate-900">Mensagem de Acompanhamento</h2>
           </div>
 
@@ -282,7 +372,7 @@ export default function NovaObraPage() {
               rows={3}
               value={formData.saudacao}
               onChange={updateField('saudacao')}
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all resize-none"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
             />
             <p className="mt-1.5 text-xs text-slate-400">
               Use <code className="bg-slate-100 px-1 rounded">[nome]</code> para o nome do mestre e{' '}
@@ -310,7 +400,7 @@ export default function NovaObraPage() {
           <button
             type="submit"
             disabled={loading}
-            className="flex items-center justify-center gap-2 rounded-xl bg-emerald-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-200 transition-all hover:bg-emerald-700 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
+            className="flex items-center justify-center gap-2 rounded-xl bg-indigo-600 px-8 py-3 text-sm font-bold text-white shadow-lg shadow-indigo-200 transition-all hover:bg-indigo-700 active:scale-95 disabled:opacity-60 disabled:cursor-not-allowed"
           >
             {loading ? (
               <>
@@ -320,7 +410,7 @@ export default function NovaObraPage() {
             ) : (
               <>
                 <Save className="h-4 w-4" />
-                Criar Obra com 20 Fases
+                {selectedChecklist ? `Criar Obra com ${selectedChecklist.fases_count} Fases` : 'Criar Obra com 20 Fases'}
               </>
             )}
           </button>

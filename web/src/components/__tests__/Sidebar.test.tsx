@@ -25,7 +25,7 @@ describe('Sidebar Component', () => {
   it('highlights the active menu item', () => {
     render(<Sidebar />)
     const dashboardLink = screen.getByRole('link', { name: /Dashboard/i })
-    expect(dashboardLink).toHaveClass('bg-emerald-50')
-    expect(dashboardLink).toHaveClass('text-emerald-700')
+    expect(dashboardLink).toHaveClass('bg-indigo-50')
+    expect(dashboardLink).toHaveClass('text-indigo-700')
   })
 })

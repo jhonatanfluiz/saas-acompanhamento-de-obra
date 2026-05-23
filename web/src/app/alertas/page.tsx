@@ -1,7 +1,8 @@
 'use client';
 
 import React from 'react';
-import { AlertTriangle, MapPin, Clock, CheckCircle } from 'lucide-react';
+import { AlertTriangle, MapPin, Clock, CheckCircle, ArrowLeft } from 'lucide-react';
+import Link from 'next/link';
 
 const alertas = [
   { id: 1, obra: 'Residencial Alpha', fase: 'Elétrica', tipo: 'Crítico', msg: 'Mestre reportou NÃO para concretagem 3 semanas seguidas.', data: 'Há 2 horas', status: 'pendente' },
@@ -12,6 +13,13 @@ const alertas = [
 export default function AlertasPage() {
   return (
     <div className="space-y-6">
+      {/* Botão Voltar */}
+      <div>
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors mb-2">
+          <ArrowLeft size={16} /> Voltar ao Dashboard
+        </Link>
+      </div>
+
       <div>
         <h1 className="text-2xl font-bold text-slate-900">Alertas e Anomalias</h1>
         <p className="text-slate-500">Acompanhe situações que exigem atenção imediata.</p>
@@ -54,10 +62,10 @@ export default function AlertasPage() {
               <div className="flex items-center gap-2">
                 {alerta.status === 'pendente' ? (
                   <>
-                    <button className="rounded-xl bg-slate-900 px-4 py-2 text-xs font-bold text-white hover:bg-slate-800">
+                    <button className="rounded-xl bg-indigo-600 px-4 py-2 text-xs font-bold text-white hover:bg-indigo-700 transition-colors">
                       Resolver
                     </button>
-                    <button className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50">
+                    <button className="rounded-xl border border-slate-200 px-4 py-2 text-xs font-bold text-slate-600 hover:bg-slate-50 transition-colors">
                       Ignorar
                     </button>
                   </>

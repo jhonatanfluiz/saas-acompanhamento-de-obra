@@ -62,7 +62,7 @@
         "bodyParameters": {
           "parameters": [
             { "name": "number", "value": "={{ $json.telefone }}" },
-            { "name": "text", "value": "Bom dia {{ $json.mestre_obras }}.\nObra: {{ $json.obra_nome }}\nFase: {{ $json.fase_nome }}\n\n1. {{ $json.pergunta_texto }}\n\nResponda com SIM, NÃO ou o progresso estimado (25%, 50%, 75% ou 100%)." }
+            { "name": "text", "value": "Olá {{ $json.mestre_obras || 'Mestre' }}! 👷‍♂️\nObra: {{ $json.obra_nome }}\nFase: {{ $json.fase_nome }}\n\nPergunta:\n👉 *{{ $json.pergunta_texto }}*\n\nResponda apenas com *SIM*, *NÃO* ou *N/A*." }
           ]
         },
         "options": {}

@@ -35,24 +35,7 @@ export async function POST(req: Request) {
     // Extrair apenas o número de telefone (limpar sufixo e non-digits)
     const phone = remoteJid.split('@')[0].replace(/\D/g, '');
 
-    // 1. Validar se a resposta é SIM, NÃO ou porcentagem (25%, 50%, 75%, 100%)
-    const respostaUpper = textMessage.trim().toUpperCase();
-    const regexValida = /^(SIM|NÃO|NAO|25%|50%|75%|100%|25|50|75|100)$/i;
-    
-    if (!regexValida.test(respostaUpper)) {
-      await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Por favor, responda com SIM, NÃO ou uma porcentagem de progresso (25%, 50%, 75% ou 100%).');
-      return NextResponse.json({ message: 'Resposta inválida solicitada novamente' }, { status: 200 });
-    }
-
-    let respostaFinal = respostaUpper;
-    if (respostaFinal === 'NAO') {
-      respostaFinal = 'NÃO';
-    } else if (['25', '50', '75', '100'].includes(respostaFinal)) {
-      respostaFinal = `${respostaFinal}%`;
-    }
-
     // 2. Identificar o Mestre de Obras pelo telefone
-    // Supondo que o telefone no BD esteja cadastrado no formato parecido (ou aplicar %LIKE%)
     const { data: usuario, error: userError } = await supabase
       .from('usuarios')
       .select('id, nome')
@@ -65,7 +48,6 @@ export async function POST(req: Request) {
     }
 
     // 3. Buscar Obra Ativa vinculada a este usuário que tem perguntas pendentes
-    // Para simplificar: Busca a fase atual (que não está concluída) da obra do usuário
     const { data: obraFase, error: obraError } = await supabase
       .from('obras')
       .select(`
@@ -115,6 +97,42 @@ export async function POST(req: Request) {
       return NextResponse.json({ message: 'Fase já respondida' }, { status: 200 });
     }
 
+    // 5. Validar Resposta Contextualmente
+    const ordemPergunta = perguntaPendente.ordem;
+    const respostaTrim = textMessage.trim();
+    let respostaFinal = '';
+
+    if (ordemPergunta === 1) {
+      const regexValida = /^(SIM|NÃO|NAO|N\/A|NA)$/i;
+      if (!regexValida.test(respostaTrim)) {
+        await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Para esta pergunta, por favor responda apenas com *SIM*, *NÃO* ou *N/A*.');
+        return NextResponse.json({ message: 'Resposta inválida' }, { status: 200 });
+      }
+
+      const respostaUpper = respostaTrim.toUpperCase();
+      if (respostaUpper === 'NAO') {
+        respostaFinal = 'NÃO';
+      } else if (respostaUpper === 'NA' || respostaUpper === 'N/A') {
+        respostaFinal = 'N/A';
+      } else {
+        respostaFinal = 'SIM';
+      }
+    } else {
+      // Pergunta 2: Percentual
+      const regexValida = /^(25%|50%|75%|100%|25|50|75|100)$/i;
+      if (!regexValida.test(respostaTrim)) {
+        await enviarMensagemWhatsApp(remoteJid, 'Resposta inválida. Para esta pergunta, responda com o percentual executado: *25%*, *50%*, *75%* ou *100%*.');
+        return NextResponse.json({ message: 'Resposta inválida' }, { status: 200 });
+      }
+
+      const match = respostaTrim.match(/\d+/);
+      if (match) {
+        respostaFinal = `${match[0]}%`;
+      } else {
+        respostaFinal = '100%';
+      }
+    }
+
     // 4. Salvar a resposta
     const { error: insertError } = await supabase
       .from('respostas')
@@ -130,9 +148,6 @@ export async function POST(req: Request) {
       throw insertError;
     }
 
-    // O Trigger no banco de dados (trg_atualiza_progresso) atualizará o percentual 
-    // e gerará alertas se a resposta for NÃO.
-
     // 5. Verificar se temos alertas críticos (Mais de 2 'NÃO')
     const { count: countNao } = await supabase
       .from('respostas')
@@ -141,7 +156,6 @@ export async function POST(req: Request) {
       .eq('resposta', 'NÃO');
 
     if (countNao && countNao >= 3) {
-      // Gera alerta CRÍTICO pois já são mais de 2 respostas NÃO na obra inteira (ou pode filtrar por fase)
       await supabase.from('alertas').insert({
         obra_id: obraFase.id,
         fase_id: faseAtual.id,
@@ -150,13 +164,50 @@ export async function POST(req: Request) {
       });
     }
 
-    // 6. Enviar confirmação ou a próxima pergunta
-    const temProximaPergunta = faseAtual.perguntas.find((p: any) => p.id !== perguntaPendente.id && !respondidasIds.includes(p.id));
-    
-    if (temProximaPergunta) {
-      await enviarMensagemWhatsApp(remoteJid, `Anotado!\n\nAgora a 2ª pergunta:\n${temProximaPergunta.texto_pergunta}\n\nResponda com SIM, NÃO ou uma porcentagem (25%, 50%, 75% ou 100%).`);
+    // 6. Enviar confirmação ou a próxima pergunta com desvio condicional
+    const pularPergunta2 = (ordemPergunta === 1 && (respostaFinal === 'NÃO' || respostaFinal === 'N/A'));
+
+    if (pularPergunta2) {
+      // Pula a Pergunta 2 e busca a próxima fase
+      const proximasFases = ((obraFase.fases as any[]) || []).sort((a, b) => a.ordem - b.ordem);
+      const proximaFase = proximasFases.find((f: any) => f.ordem > faseAtual.ordem);
+
+      if (proximaFase && proximaFase.perguntas && proximaFase.perguntas.length > 0) {
+        const perguntasProxima = proximaFase.perguntas.sort((a: any, b: any) => a.ordem - b.ordem);
+        const primeiraPerguntaProxima = perguntasProxima[0];
+
+        await enviarMensagemWhatsApp(
+          remoteJid,
+          `Anotado! Como esta etapa não foi executada, vamos para a próxima fase *${proximaFase.nome}*.\n\nPergunta 1:\n👉 *${primeiraPerguntaProxima.texto_pergunta}*\n\nResponda com *SIM*, *NÃO* ou *N/A*.`
+        );
+      } else {
+        await enviarMensagemWhatsApp(
+          remoteJid,
+          `Anotado! Você concluiu todas as fases e perguntas de acompanhamento da obra *${obraFase.nome}*. Excelente trabalho! 🎉`
+        );
+      }
     } else {
-      await enviarMensagemWhatsApp(remoteJid, `Perfeito, ${usuario.nome}. Respostas da semana registradas com sucesso. Bom trabalho na obra ${obraFase.nome}!`);
+      const temProximaPergunta = faseAtual.perguntas.find((p: any) => p.id !== perguntaPendente.id && !respondidasIds.includes(p.id));
+      
+      if (temProximaPergunta) {
+        await enviarMensagemWhatsApp(remoteJid, `Anotado!\n\nPróxima pergunta da fase *${faseAtual.nome}*:\n\n👉 *${temProximaPergunta.texto_pergunta}*\n\nResponda com *25%*, *50%*, *75%* ou *100%*.`);
+      } else {
+        // Buscar próxima fase
+        const proximasFases = ((obraFase.fases as any[]) || []).sort((a, b) => a.ordem - b.ordem);
+        const proximaFase = proximasFases.find((f: any) => f.ordem > faseAtual.ordem);
+
+        if (proximaFase && proximaFase.perguntas && proximaFase.perguntas.length > 0) {
+          const perguntasProxima = proximaFase.perguntas.sort((a: any, b: any) => a.ordem - b.ordem);
+          const primeiraPerguntaProxima = perguntasProxima[0];
+
+          await enviarMensagemWhatsApp(
+            remoteJid,
+            `Excelente! Você concluiu a fase *${faseAtual.nome}* da obra *${obraFase.nome}*.\n\nVamos iniciar a próxima fase *${proximaFase.nome}*!\n\nPergunta 1:\n👉 *${primeiraPerguntaProxima.texto_pergunta}*\n\nResponda com *SIM*, *NÃO* ou *N/A*.`
+          );
+        } else {
+          await enviarMensagemWhatsApp(remoteJid, `Perfeito, ${usuario.nome}. Respostas da semana registradas com sucesso. Bom trabalho na obra ${obraFase.nome}!`);
+        }
+      }
     }
 
     return NextResponse.json({ success: true });

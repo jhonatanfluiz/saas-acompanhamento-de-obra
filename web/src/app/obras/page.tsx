@@ -17,6 +17,8 @@ import {
   X,
   Save,
   Loader2,
+  ArrowLeft,
+  Trash2,
 } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
@@ -70,6 +72,51 @@ export default function ObrasPage() {
   const [updating, setUpdating] = useState(false);
   const [editError, setEditError] = useState<string | null>(null);
 
+  // Estados de Deleção
+  const [obraToDelete, setObraToDelete] = useState<Obra | null>(null);
+  const [deletingType, setDeletingType] = useState<'soft' | 'hard' | null>(null);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+
+  const handleSoftDelete = async (obraId: string) => {
+    setDeletingType('soft');
+    setDeleteError(null);
+    try {
+      const { error: err } = await supabase
+        .from('obras')
+        .update({ status: 'arquivada' })
+        .eq('id', obraId);
+
+      if (err) throw err;
+      
+      setObraToDelete(null);
+      fetchObras();
+    } catch (e: any) {
+      setDeleteError(e.message || 'Erro ao arquivar obra.');
+    } finally {
+      setDeletingType(null);
+    }
+  };
+
+  const handleHardDelete = async (obraId: string) => {
+    setDeletingType('hard');
+    setDeleteError(null);
+    try {
+      const { error: err } = await supabase
+        .from('obras')
+        .delete()
+        .eq('id', obraId);
+
+      if (err) throw err;
+
+      setObraToDelete(null);
+      fetchObras();
+    } catch (e: any) {
+      setDeleteError(e.message || 'Erro ao excluir obra permanentemente.');
+    } finally {
+      setDeletingType(null);
+    }
+  };
+
   const fetchObras = async () => {
     setLoading(true);
     setError(null);
@@ -89,6 +136,7 @@ export default function ObrasPage() {
           data_entrega_prevista,
           alertas(id, resolvido)
         `)
+        .neq('status', 'arquivada')
         .order('created_at', { ascending: false });
 
       if (err) throw err;
@@ -222,6 +270,13 @@ export default function ObrasPage() {
 
   return (
     <div className="space-y-6">
+      {/* Botão Voltar */}
+      <div>
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors mb-2">
+          <ArrowLeft size={16} /> Voltar ao Dashboard
+        </Link>
+      </div>
+
       {/* Cabeçalho */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
@@ -239,7 +294,7 @@ export default function ObrasPage() {
           </button>
           <Link
             href="/obras/novo"
-            className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors"
+            className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
           >
             <Plus className="h-5 w-5" />
             Cadastrar Obra
@@ -260,7 +315,7 @@ export default function ObrasPage() {
             onClick={() => setFilterStatus(key)}
             className={`flex items-center gap-1.5 rounded-full px-4 py-1.5 text-sm font-semibold transition-all ${
               filterStatus === key
-                ? 'bg-emerald-600 text-white shadow-sm'
+                ? 'bg-indigo-600 text-white shadow-sm'
                 : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
             }`}
           >
@@ -281,14 +336,14 @@ export default function ObrasPage() {
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Buscar por nome da obra ou responsável..."
-          className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-emerald-500 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 shadow-sm"
+          className="w-full rounded-xl border border-slate-200 bg-white py-3 pl-10 pr-4 text-sm text-slate-800 placeholder:text-slate-400 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 shadow-sm"
         />
       </div>
 
       {/* Estado de carregamento */}
       {loading && (
         <div className="flex flex-col items-center justify-center py-20 gap-4">
-          <div className="h-10 w-10 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
+          <div className="h-10 w-10 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
           <p className="text-sm text-slate-400 font-medium">Carregando obras...</p>
         </div>
       )}
@@ -323,7 +378,7 @@ export default function ObrasPage() {
               {!search && filterStatus === 'todos' && (
                 <Link
                   href="/obras/novo"
-                  className="flex items-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors"
+                  className="flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors"
                 >
                   <Plus className="h-4 w-4" />
                   Cadastrar Primeira Obra
@@ -455,6 +510,16 @@ export default function ObrasPage() {
                               <Edit3 size={14} className="text-slate-400" />
                               Atualizar dados
                             </button>
+                            <button
+                              onClick={() => {
+                                setActiveMenuId(null);
+                                setObraToDelete(obra);
+                              }}
+                              className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-left text-xs font-semibold text-red-600 hover:bg-red-50 hover:text-red-700 transition-colors border-t border-slate-100 mt-1 pt-2 rounded-t-none"
+                            >
+                              <Trash2 size={14} className="text-red-500" />
+                              Excluir obra
+                            </button>
                           </div>
                         )}
                       </td>
@@ -507,7 +572,7 @@ export default function ObrasPage() {
                   type="text" 
                   value={editingObra.nome} 
                   onChange={(e) => setEditingObra({ ...editingObra, nome: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                 />
               </div>
 
@@ -517,7 +582,7 @@ export default function ObrasPage() {
                   type="text" 
                   value={editingObra.cliente || ''} 
                   onChange={(e) => setEditingObra({ ...editingObra, cliente: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                 />
               </div>
 
@@ -528,7 +593,7 @@ export default function ObrasPage() {
                     type="text" 
                     value={editingObra.responsavel || ''} 
                     onChange={(e) => setEditingObra({ ...editingObra, responsavel: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                   />
                 </div>
                 <div>
@@ -537,7 +602,7 @@ export default function ObrasPage() {
                     type="tel" 
                     value={editingObra.telefone || ''} 
                     onChange={(e) => setEditingObra({ ...editingObra, telefone: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                   />
                 </div>
               </div>
@@ -549,7 +614,7 @@ export default function ObrasPage() {
                     type="date" 
                     value={editingObra.data_inicio || ''} 
                     onChange={(e) => setEditingObra({ ...editingObra, data_inicio: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                   />
                 </div>
                 <div>
@@ -558,7 +623,7 @@ export default function ObrasPage() {
                     type="date" 
                     value={editingObra.data_entrega_prevista || ''} 
                     onChange={(e) => setEditingObra({ ...editingObra, data_entrega_prevista: e.target.value })}
-                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                    className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                   />
                 </div>
               </div>
@@ -568,7 +633,7 @@ export default function ObrasPage() {
                 <select 
                   value={editingObra.status} 
                   onChange={(e) => setEditingObra({ ...editingObra, status: e.target.value })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all"
                 >
                   <option value="ativa">Ativa</option>
                   <option value="pausada">Pausada</option>
@@ -583,7 +648,7 @@ export default function ObrasPage() {
                   value={editingObra.saudacao || ''} 
                   onChange={(e) => setEditingObra({ ...editingObra, saudacao: e.target.value })}
                   rows={2}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/10 transition-all resize-none text-xs"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-900 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/10 transition-all resize-none text-xs"
                   placeholder="Mensagem disparada na saudação inicial..."
                 />
               </div>
@@ -601,7 +666,7 @@ export default function ObrasPage() {
                 type="button" 
                 disabled={updating}
                 onClick={handleUpdateSubmit}
-                className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                className="flex items-center justify-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
               >
                 {updating ? (
                   <>
@@ -614,6 +679,96 @@ export default function ObrasPage() {
                     Salvar Alterações
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal de Exclusão de Obra */}
+      {obraToDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div 
+            onClick={(e) => e.stopPropagation()} 
+            className="w-full max-w-md rounded-2xl border border-slate-100 bg-white p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200"
+          >
+            <div className="flex items-center gap-3 border-b border-slate-100 pb-3">
+              <div className="p-2 bg-amber-50 rounded-xl text-amber-600">
+                <AlertTriangle size={22} />
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Excluir Obra</h3>
+                <p className="text-xs text-slate-500 font-medium">#{obraToDelete.id.slice(0, 8).toUpperCase()}</p>
+              </div>
+            </div>
+
+            {deleteError && (
+              <div className="rounded-xl bg-red-50 border border-red-100 p-3 text-xs font-semibold text-red-600">
+                {deleteError}
+              </div>
+            )}
+
+            <div className="space-y-3">
+              <p className="text-sm text-slate-600 leading-relaxed">
+                Você está prestes a excluir a obra <strong className="text-slate-900">"{obraToDelete.nome}"</strong>. 
+                Como deseja prosseguir?
+              </p>
+              
+              <div className="bg-slate-50 rounded-xl p-3.5 border border-slate-100 space-y-2">
+                <h4 className="text-xs font-bold text-slate-700 uppercase tracking-wide">Opções de Exclusão:</h4>
+                <div className="text-xs text-slate-500 space-y-1.5 pl-1">
+                  <div>• <strong className="text-slate-700">Manter no histórico:</strong> Remove a obra do dashboard ativo, mas preserva todo o histórico de respostas para consultas futuras.</div>
+                  <div>• <strong className="text-slate-700">Apagar definitivamente:</strong> Remove permanentemente a obra e todos os dados relacionados do banco de dados de forma irreversível.</div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex flex-col gap-2.5 pt-2 border-t border-slate-100">
+              <button
+                type="button"
+                disabled={deletingType !== null}
+                onClick={() => handleSoftDelete(obraToDelete.id)}
+                className="flex items-center justify-center gap-2 w-full rounded-xl border border-indigo-200 bg-indigo-50/50 hover:bg-indigo-50 px-4 py-3 text-sm font-bold text-indigo-700 transition-colors disabled:opacity-50"
+              >
+                {deletingType === 'soft' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Salvando no Histórico...
+                  </>
+                ) : (
+                  <>
+                    <Clock size={16} />
+                    Apagar e manter no histórico
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={deletingType !== null}
+                onClick={() => handleHardDelete(obraToDelete.id)}
+                className="flex items-center justify-center gap-2 w-full rounded-xl bg-rose-600 hover:bg-rose-700 px-4 py-3 text-sm font-bold text-white transition-colors disabled:opacity-50 shadow-sm shadow-rose-100"
+              >
+                {deletingType === 'hard' ? (
+                  <>
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    Excluindo definitivamente...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 size={16} />
+                    Apagar definitivamente
+                  </>
+                )}
+              </button>
+
+              <button
+                type="button"
+                disabled={deletingType !== null}
+                onClick={() => setObraToDelete(null)}
+                className="w-full rounded-xl border border-slate-200 bg-white hover:bg-slate-50 px-4 py-2.5 text-sm font-semibold text-slate-700 transition-colors disabled:opacity-50 mt-1"
+              >
+                Cancelar
               </button>
             </div>
           </div>

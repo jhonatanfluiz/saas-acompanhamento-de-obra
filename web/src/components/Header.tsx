@@ -53,7 +53,7 @@ export default function Header() {
           <div className="relative w-full max-w-md lg:max-w-xs">
             <button 
               onClick={applySearch}
-              className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 hover:text-emerald-600 transition-colors"
+              className="absolute inset-y-0 left-0 flex items-center pl-3 text-slate-400 hover:text-indigo-600 transition-colors"
             >
               <Search className="h-4 w-4" />
             </button>
@@ -62,7 +62,7 @@ export default function Header() {
               value={searchQuery}
               onChange={handleSearchChange}
               onKeyDown={handleKeyDown}
-              className="block w-full rounded-full border-0 bg-slate-100 py-1.5 pl-10 pr-3 text-sm text-slate-900 ring-1 ring-inset ring-transparent transition-all placeholder:text-slate-500 focus:bg-white focus:ring-2 focus:ring-emerald-600"
+              className="block w-full rounded-full border-0 bg-slate-100 py-1.5 pl-10 pr-3 text-sm text-slate-900 ring-1 ring-inset ring-transparent transition-all placeholder:text-slate-500 focus:bg-white focus:ring-2 focus:ring-indigo-600"
               placeholder="Buscar obras..."
             />
           </div>
@@ -71,7 +71,7 @@ export default function Header() {
         <div className="flex items-center space-x-4">
           <button 
             aria-label="Notificações"
-            className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-emerald-600"
+            className="relative rounded-full p-2 text-slate-500 hover:bg-slate-100 hover:text-indigo-600"
           >
             <Bell size={20} />
             <span className="absolute right-2 top-2 h-2 w-2 rounded-full bg-red-500 ring-2 ring-white"></span>
@@ -85,7 +85,7 @@ export default function Header() {
             <button 
               onClick={() => setIsProfileMenuOpen(!isProfileMenuOpen)}
               aria-label="Menu do Usuário"
-              className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 text-emerald-700 hover:ring-2 hover:ring-emerald-600 hover:ring-offset-2 transition-all"
+              className="flex h-10 w-10 items-center justify-center rounded-full bg-indigo-100 text-indigo-700 hover:ring-2 hover:ring-indigo-600 hover:ring-offset-2 transition-all"
             >
               <User size={20} />
             </button>
@@ -112,7 +112,7 @@ export default function Header() {
                     className="flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
                   >
                     <div className="flex items-center">
-                      <UserPlus className="mr-3 h-4 w-4 text-emerald-500" />
+                      <UserPlus className="mr-3 h-4 w-4 text-indigo-500" />
                       <span>Cadastrar Novo Adm</span>
                     </div>
                   </button>
@@ -121,10 +121,10 @@ export default function Header() {
                 <div className="mt-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-100">
                   <div className="flex justify-between items-center mb-1">
                     <span className="text-xs font-semibold text-slate-600">Limite de Administradores</span>
-                    <span className="text-xs font-bold text-emerald-600">1 / 10</span>
+                    <span className="text-xs font-bold text-indigo-600">1 / 10</span>
                   </div>
                   <div className="h-1.5 w-full rounded-full bg-slate-200 overflow-hidden">
-                    <div className="h-full bg-emerald-500 w-[10%]"></div>
+                    <div className="h-full bg-indigo-500 w-[10%]"></div>
                   </div>
                   <p className="text-[10px] text-slate-400 mt-1 text-right">9 vagas disponíveis</p>
                 </div>

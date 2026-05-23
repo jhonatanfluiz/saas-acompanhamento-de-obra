@@ -1,9 +1,10 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { Layers, Search, ChevronRight, CheckCircle2, Clock, AlertCircle, Trash2, Plus, X, ArrowUp, ArrowDown } from 'lucide-react';
+import { Layers, Search, ChevronRight, CheckCircle2, Clock, AlertCircle, Trash2, Plus, X, ArrowUp, ArrowDown, ArrowLeft } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 
 export default function FasesPage() {
   const router = useRouter();
@@ -113,6 +114,13 @@ export default function FasesPage() {
 
   return (
     <div className="space-y-6">
+      {/* Botão Voltar */}
+      <div>
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors mb-2">
+          <ArrowLeft size={16} /> Voltar ao Dashboard
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Gestão de Fases</h1>
@@ -131,7 +139,7 @@ export default function FasesPage() {
                   key={obra.id} 
                   onClick={() => setSelectedObraId(obra.id)}
                   className={`w-full flex items-center justify-between p-3 rounded-xl text-sm font-medium transition-all ${
-                    selectedObraId === obra.id ? 'bg-emerald-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
+                    selectedObraId === obra.id ? 'bg-indigo-600 text-white shadow-md' : 'bg-slate-50 text-slate-600 hover:bg-slate-100'
                   }`}
                 >
                   <span className="truncate pr-2 text-left">{obra.nome}</span>
@@ -154,7 +162,7 @@ export default function FasesPage() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 placeholder="Filtrar fases..." 
-                className="w-full rounded-xl border border-slate-100 bg-slate-50 py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-emerald-500 outline-none transition-all"
+                className="w-full rounded-xl border border-slate-100 bg-slate-50 py-2 pl-10 pr-4 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
               />
             </div>
           </div>
@@ -164,23 +172,23 @@ export default function FasesPage() {
               <div className="p-8 text-center text-slate-400">Carregando fases...</div>
             ) : filteredFases.length > 0 ? (
               filteredFases.map((fase, index) => (
-                <div key={fase.id} className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-emerald-200 hover:shadow-md flex-wrap gap-4">
+                <div key={fase.id} className="group flex items-center justify-between rounded-2xl border border-slate-200 bg-white p-5 transition-all hover:border-indigo-200 hover:shadow-md flex-wrap gap-4">
                   <div className="flex items-center gap-5 min-w-0">
                     <div className="flex flex-col items-center gap-1 shrink-0">
                       <button 
                         onClick={() => handleMoveFase(index, 'up')}
                         disabled={index === 0 || isProcessing?.startsWith('move')}
-                        className="text-slate-300 hover:text-emerald-600 disabled:opacity-30 disabled:hover:text-slate-300 transition-colors"
+                        className="text-slate-300 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-300 transition-colors"
                       >
                         <ArrowUp size={16} />
                       </button>
-                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 font-bold text-slate-500 group-hover:bg-emerald-100 group-hover:text-emerald-700 transition-colors">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-100 font-bold text-slate-500 group-hover:bg-indigo-100 group-hover:text-indigo-700 transition-colors">
                         {fase.ordem}
                       </div>
                       <button 
                         onClick={() => handleMoveFase(index, 'down')}
                         disabled={index === filteredFases.length - 1 || isProcessing?.startsWith('move')}
-                        className="text-slate-300 hover:text-emerald-600 disabled:opacity-30 disabled:hover:text-slate-300 transition-colors"
+                        className="text-slate-300 hover:text-indigo-600 disabled:opacity-30 disabled:hover:text-slate-300 transition-colors"
                       >
                         <ArrowDown size={16} />
                       </button>
@@ -197,7 +205,7 @@ export default function FasesPage() {
                         <div className="flex items-center gap-2">
                           <div className="h-1.5 w-24 sm:w-32 rounded-full bg-slate-100 overflow-hidden">
                             <div 
-                              className="h-full bg-emerald-500 transition-all" 
+                              className="h-full bg-indigo-600 transition-all" 
                               style={{ width: `${fase.progresso}%` }}
                             ></div>
                           </div>
@@ -229,15 +237,15 @@ export default function FasesPage() {
             )}
             
             {isAddingPhase ? (
-              <div className="flex flex-col gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 shadow-sm transition-all">
-                <h4 className="text-sm font-bold text-emerald-800">Nova Fase</h4>
+              <div className="flex flex-col gap-3 rounded-2xl border border-indigo-200 bg-indigo-50 p-5 shadow-sm transition-all">
+                <h4 className="text-sm font-bold text-indigo-800">Nova Fase</h4>
                 <div className="flex flex-col sm:flex-row items-center gap-3">
                   <input
                     type="text"
                     value={newPhaseName}
                     onChange={(e) => setNewPhaseName(e.target.value)}
                     placeholder="Ex: Instalações Elétricas..."
-                    className="flex-1 rounded-xl border border-emerald-200 bg-white px-4 py-2.5 text-sm focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 w-full"
+                    className="flex-1 rounded-xl border border-indigo-200 bg-white px-4 py-2.5 text-sm focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 w-full"
                     autoFocus
                   />
                   <div className="flex items-center gap-2 w-full sm:w-auto">
@@ -250,7 +258,7 @@ export default function FasesPage() {
                     <button
                       onClick={handleAddFase}
                       disabled={isProcessing === 'add' || !newPhaseName.trim()}
-                      className="flex-1 sm:flex-none flex items-center justify-center rounded-xl bg-emerald-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-emerald-700 transition-colors disabled:opacity-50"
+                      className="flex-1 sm:flex-none flex items-center justify-center rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-indigo-700 transition-colors disabled:opacity-50"
                     >
                       {isProcessing === 'add' ? 'Salvando...' : 'Salvar Fase'}
                     </button>
@@ -261,7 +269,7 @@ export default function FasesPage() {
               <button 
                 onClick={() => setIsAddingPhase(true)}
                 disabled={!selectedObraId}
-                className="flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-8 text-sm font-medium text-slate-400 transition-all hover:border-emerald-300 hover:text-emerald-600 disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex items-center justify-center rounded-2xl border-2 border-dashed border-slate-200 p-8 text-sm font-medium text-slate-400 transition-all hover:border-indigo-300 hover:text-indigo-600 disabled:opacity-50 disabled:cursor-not-allowed"
               >
                 <Plus className="mr-2 h-5 w-5" />
                 Adicionar Fase Manual (Opcional)

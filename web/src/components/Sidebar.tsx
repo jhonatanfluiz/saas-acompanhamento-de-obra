@@ -33,11 +33,11 @@ export default function Sidebar() {
     <aside className="fixed left-0 top-0 z-40 h-screen w-64 border-r border-slate-200 bg-white transition-transform lg:translate-x-0">
       <div className="flex h-full flex-col px-3 py-4">
         <div className="mb-8 flex items-center px-4">
-          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-emerald-600 text-white">
+          <div className="mr-3 flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-600 text-white">
             <HardHat size={20} />
           </div>
           <span className="text-xl font-bold tracking-tight text-slate-900">
-            Obra<span className="text-emerald-600">SaaS</span>
+            Obra<span className="text-indigo-600">SaaS</span>
           </span>
         </div>
         
@@ -50,11 +50,11 @@ export default function Sidebar() {
                 href={item.href}
                 className={`flex items-center rounded-lg px-4 py-3 text-sm font-medium transition-colors ${
                   isActive 
-                    ? 'bg-emerald-50 text-emerald-700' 
+                    ? 'bg-indigo-50 text-indigo-700' 
                     : 'text-slate-600 hover:bg-slate-50 hover:text-slate-900'
                 }`}
               >
-                <item.icon className={`mr-3 h-5 w-5 ${isActive ? 'text-emerald-600' : 'text-slate-400'}`} />
+                <item.icon className={`mr-3 h-5 w-5 ${isActive ? 'text-indigo-600' : 'text-slate-400'}`} />
                 {item.label}
               </Link>
             );

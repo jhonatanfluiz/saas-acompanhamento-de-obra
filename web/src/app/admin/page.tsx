@@ -8,8 +8,10 @@ import {
   TrendingUp, 
   Search, 
   MoreVertical,
-  Activity
+  Activity,
+  ArrowLeft
 } from 'lucide-react';
+import Link from 'next/link';
 import KPICard from '@/components/KPICard';
 
 const empresas = [
@@ -21,6 +23,13 @@ const empresas = [
 export default function AdminSaaSPage() {
   return (
     <div className="space-y-8">
+      {/* Botão Voltar */}
+      <div>
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors mb-2">
+          <ArrowLeft size={16} /> Voltar ao Dashboard
+        </Link>
+      </div>
+
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Admin SaaS Console</h1>
@@ -34,7 +43,7 @@ export default function AdminSaaSPage() {
           title="MRR Total" 
           value="R$ 42.850" 
           icon={TrendingUp} 
-          color="emerald" 
+          color="indigo" 
           trend="+12% este mês"
           trendType="up"
         />
@@ -68,7 +77,7 @@ export default function AdminSaaSPage() {
             <input 
               type="text" 
               placeholder="Buscar empresa..." 
-              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm"
+              className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pl-10 pr-3 text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
             />
           </div>
         </div>

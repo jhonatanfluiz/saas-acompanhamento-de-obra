@@ -18,7 +18,9 @@ import {
   ExternalLink,
   HelpCircle,
   Play,
+  ArrowLeft,
 } from 'lucide-react';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 interface Obra {
@@ -33,6 +35,8 @@ interface Pergunta {
   fase_id: string;
   texto_pergunta: string;
   ordem: number;
+  peso?: number;
+  identificador_unico?: string | null;
 }
 
 interface Fase {
@@ -65,6 +69,8 @@ export default function PerguntasPage() {
     mensagem: string;
     fase: string;
     pergunta: string;
+    pergunta_ordem?: number;
+    is_legacy?: boolean;
   } | null>(null);
   const [simulating, setSimulating] = useState(false);
 
@@ -76,6 +82,8 @@ export default function PerguntasPage() {
     faseId: '',
     texto: '',
     ordem: 1,
+    peso: 1,
+    identificadorUnico: '',
   });
   const [saving, setSaving] = useState(false);
 
@@ -142,7 +150,9 @@ export default function PerguntasPage() {
             id,
             fase_id,
             texto_pergunta,
-            ordem
+            ordem,
+            peso,
+            identificador_unico
           )
         `)
         .eq('obra_id', obraId)
@@ -197,7 +207,9 @@ export default function PerguntasPage() {
             name: disp.manager_name,
             mensagem: disp.mensagem,
             fase: disp.fase_nome,
-            pergunta: disp.pergunta_texto
+            pergunta: disp.pergunta_texto,
+            pergunta_ordem: disp.pergunta_ordem,
+            is_legacy: disp.is_legacy
           });
           
           // ABRE AUTOMATICAMENTE O WHATSAPP WEB EM NOVA ABA PRE-PREENCHIDA SE SOLICITADO
@@ -228,7 +240,7 @@ export default function PerguntasPage() {
   };
 
   // Simulate incoming manager reply via Webhook
-  const handleSimulateReply = async (resposta: 'SIM' | 'NÃO') => {
+  const handleSimulateReply = async (resposta: string) => {
     if (!offlineGatewayDetails) return;
     setSimulating(true);
     try {
@@ -293,6 +305,8 @@ export default function PerguntasPage() {
       faseId: defaultFaseId,
       texto: '',
       ordem: nextOrdem,
+      peso: 1,
+      identificadorUnico: '',
     });
     setIsModalOpen(true);
   };
@@ -305,6 +319,8 @@ export default function PerguntasPage() {
       faseId: pergunta.fase_id,
       texto: pergunta.texto_pergunta,
       ordem: pergunta.ordem,
+      peso: pergunta.peso || 1,
+      identificadorUnico: pergunta.identificador_unico || '',
     });
     setIsModalOpen(true);
   };
@@ -326,6 +342,8 @@ export default function PerguntasPage() {
             fase_id: modalFormData.faseId,
             texto_pergunta: modalFormData.texto.trim(),
             ordem: modalFormData.ordem,
+            peso: modalFormData.peso,
+            identificador_unico: modalFormData.identificadorUnico.trim() || null,
           });
 
         if (err) throw err;
@@ -338,6 +356,8 @@ export default function PerguntasPage() {
             texto_pergunta: modalFormData.texto.trim(),
             ordem: modalFormData.ordem,
             fase_id: modalFormData.faseId,
+            peso: modalFormData.peso,
+            identificador_unico: modalFormData.identificadorUnico.trim() || null,
           })
           .eq('id', editingQuestionId);
 
@@ -384,11 +404,18 @@ export default function PerguntasPage() {
         </div>
       )}
 
+      {/* Botão Voltar */}
+      <div>
+        <Link href="/dashboard" className="inline-flex items-center gap-2 text-sm font-semibold text-slate-500 hover:text-indigo-600 transition-colors mb-2">
+          <ArrowLeft size={16} /> Voltar ao Dashboard
+        </Link>
+      </div>
+
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Configuração de Perguntas</h1>
-          <p className="text-slate-500">Defina as 2 perguntas semanais para cada fase da obra.</p>
+          <p className="text-slate-500">Defina as perguntas de acompanhamento para cada fase da obra.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {selectedObraId && (
@@ -414,7 +441,7 @@ export default function PerguntasPage() {
                 value={selectedObraId}
                 onChange={(e) => setSelectedObraId(e.target.value)}
                 disabled={loadingObras}
-                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500 transition-all disabled:opacity-50 appearance-none cursor-pointer"
+                className="w-full pl-11 pr-4 py-3 rounded-xl border border-slate-200 bg-slate-50 text-sm text-slate-800 font-semibold focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all disabled:opacity-50 appearance-none cursor-pointer"
               >
                 {loadingObras ? (
                   <option>Carregando obras...</option>
@@ -423,7 +450,7 @@ export default function PerguntasPage() {
                 ) : (
                   obras.map((o) => (
                     <option key={o.id} value={o.id}>
-                      🏗️ {o.nome}
+                       🏗️ {o.nome}
                     </option>
                   ))
                 )}
@@ -436,7 +463,7 @@ export default function PerguntasPage() {
               <button
                 onClick={() => handleImmediateWhatsAppSend()}
                 disabled={dispatching || loadingFases}
-                className="flex items-center justify-center rounded-xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-emerald-100 hover:bg-emerald-700 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
+                className="flex items-center justify-center rounded-xl bg-indigo-600 px-5 py-3 text-sm font-bold text-white shadow-md shadow-indigo-100 hover:bg-indigo-700 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
               >
                 {dispatching ? (
                   <>
@@ -517,25 +544,50 @@ export default function PerguntasPage() {
               </a>
 
               <div className="border-t border-slate-200/80 pt-3">
-                <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">Simular Resposta Recebida (Testar SaaS completo)</span>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    onClick={() => handleSimulateReply('SIM')}
-                    disabled={simulating}
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50 transition-all active:scale-95"
-                  >
-                    <CheckCircle2 size={14} />
-                    Mestre respondeu "SIM"
-                  </button>
-                  <button
-                    onClick={() => handleSimulateReply('NÃO')}
-                    disabled={simulating}
-                    className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50 transition-all active:scale-95"
-                  >
-                    <X size={14} />
-                    Mestre respondeu "NÃO"
-                  </button>
-                </div>
+                <span className="block text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-2">
+                  Simular Resposta ({(!offlineGatewayDetails?.is_legacy || offlineGatewayDetails?.pergunta_ordem === 1) ? 'SIM / NÃO / N/A' : 'Percentual de Conclusão'})
+                </span>
+                {offlineGatewayDetails?.is_legacy && offlineGatewayDetails?.pergunta_ordem === 2 ? (
+                  <div className="grid grid-cols-5 gap-1.5">
+                    {['25%', '50%', '75%', '100%', 'N/A'].map((pct) => (
+                      <button
+                        key={pct}
+                        onClick={() => handleSimulateReply(pct)}
+                        disabled={simulating}
+                        className="flex items-center justify-center rounded-xl bg-indigo-600 px-1 py-2 text-[11px] font-bold text-white shadow hover:bg-indigo-700 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
+                      >
+                        {pct}
+                      </button>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-3 gap-2">
+                    <button
+                      onClick={() => handleSimulateReply('SIM')}
+                      disabled={simulating}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-emerald-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-emerald-700 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <CheckCircle2 size={14} />
+                      Mestre "SIM"
+                    </button>
+                    <button
+                      onClick={() => handleSimulateReply('NÃO')}
+                      disabled={simulating}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-rose-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-rose-700 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <X size={14} />
+                      Mestre "NÃO"
+                    </button>
+                    <button
+                      onClick={() => handleSimulateReply('N/A')}
+                      disabled={simulating}
+                      className="flex items-center justify-center gap-1.5 rounded-xl bg-slate-600 px-4 py-2.5 text-xs font-bold text-white shadow hover:bg-slate-700 disabled:opacity-50 transition-all active:scale-95 cursor-pointer"
+                    >
+                      <HelpCircle size={14} />
+                      Mestre "N/A"
+                    </button>
+                  </div>
+                )}
               </div>
             </div>
           </div>
@@ -545,7 +597,7 @@ export default function PerguntasPage() {
       {/* Carregamento das Fases */}
       {loadingFases && (
         <div className="flex flex-col items-center justify-center py-24 gap-4 animate-pulse">
-          <div className="h-10 w-10 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
+          <div className="h-10 w-10 rounded-full border-4 border-indigo-500 border-t-transparent animate-spin" />
           <p className="text-sm text-slate-500 font-medium">Carregando fases e perguntas de acompanhamento...</p>
         </div>
       )}
@@ -576,7 +628,7 @@ export default function PerguntasPage() {
                 {/* Header da Fase */}
                 <div className="bg-slate-50 border-b border-slate-100 px-6 py-4 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                   <div className="flex items-center gap-3">
-                    <span className="flex items-center justify-center h-7 w-7 rounded-full bg-emerald-100 text-xs font-bold text-emerald-800">
+                    <span className="flex items-center justify-center h-7 w-7 rounded-full bg-indigo-100 text-xs font-bold text-indigo-800">
                       {fase.ordem}
                     </span>
                     <h3 className="font-bold text-slate-800 text-base">{fase.nome}</h3>
@@ -603,7 +655,7 @@ export default function PerguntasPage() {
                       Nenhuma pergunta cadastrada para esta fase. 
                       <button
                         onClick={() => handleOpenCreateModal(fase.id)}
-                        className="text-emerald-600 font-bold ml-1 hover:underline cursor-pointer"
+                        className="text-indigo-600 font-bold ml-1 hover:underline cursor-pointer"
                       >
                         + Cadastrar Pergunta 1
                       </button>
@@ -615,14 +667,24 @@ export default function PerguntasPage() {
                         className="flex items-start justify-between p-6 transition-all hover:bg-slate-50/40 gap-4"
                       >
                         <div className="flex items-start gap-4">
-                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600 mt-0.5">
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-indigo-50 text-indigo-600 mt-0.5">
                             <MessageSquare size={18} />
                           </div>
                           <div>
-                            <div className="flex items-center gap-2 mb-1.5">
-                              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                            <div className="flex items-center gap-2 mb-1.5 flex-wrap">
+                              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-full">
                                 Pergunta {pergunta.ordem}
                               </span>
+                              {pergunta.identificador_unico && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 bg-emerald-50 px-2 py-0.5 rounded-full">
+                                  {pergunta.identificador_unico}
+                                </span>
+                              )}
+                              {pergunta.peso !== undefined && (
+                                <span className="text-[10px] font-bold uppercase tracking-wider text-amber-600 bg-amber-50 px-2 py-0.5 rounded-full">
+                                  Peso: {pergunta.peso}
+                                </span>
+                              )}
                             </div>
                             <h4 className="text-sm font-semibold text-slate-900 leading-snug">{pergunta.texto_pergunta}</h4>
                           </div>
@@ -653,7 +715,7 @@ export default function PerguntasPage() {
                     <div className="bg-slate-50/30 px-6 py-3 text-center border-t border-slate-100">
                       <button
                         onClick={() => handleOpenCreateModal(fase.id)}
-                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-emerald-600 transition-colors cursor-pointer"
+                        className="inline-flex items-center gap-1 text-xs font-bold text-slate-500 hover:text-indigo-600 transition-colors cursor-pointer"
                       >
                         <Plus size={14} />
                         Cadastrar Pergunta 2 da fase {fase.nome}
@@ -670,11 +732,13 @@ export default function PerguntasPage() {
       {/* Regras Importantes do WhatsApp */}
       <div className="rounded-2xl bg-amber-50 border border-amber-100 p-6">
         <h4 className="text-sm font-bold text-amber-800 mb-2">Importante: Regras do WhatsApp</h4>
-        <p className="text-xs text-amber-700 leading-relaxed">
-          O sistema de automação do WhatsApp espera que cada fase tenha até <strong>2 perguntas</strong> (Pergunta 1 e Pergunta 2).
-          As respostas dos encarregados/gerentes devem ser exclusivamente <strong>SIM</strong> ou <strong>NÃO</strong>.
-          Certifique-se de formular as perguntas de modo a serem respondidas com essas duas opções para viabilizar o avanço progressivo automático.
-        </p>
+        <div className="text-xs text-amber-700 leading-relaxed space-y-2">
+          <p>O sistema de automação do WhatsApp suporta dois modelos de checklist:</p>
+          <ul className="list-disc pl-5 space-y-1">
+            <li><strong>Modelo Clássico de 2 Perguntas</strong>: A Pergunta 1 aceita SIM/NÃO/N/A e a Pergunta 2 aceita porcentagem (25%, 50%, 75% ou 100%). Se responder NÃO na P1, a P2 é pulada automaticamente.</li>
+            <li><strong>Modelo Ponderado Multietapas</strong>: Fases com quantidade de perguntas diferente de 2. Todas as perguntas aceitam estritamente SIM, NÃO ou N/A, e o progresso da fase é calculado de forma ponderada pelos pesos das perguntas. Se um item com peso &ge; 3 for respondido como NÃO, um alerta crítico é gerado automaticamente.</li>
+          </ul>
+        </div>
       </div>
 
       {/* Modal - Cadastrar / Editar Pergunta */}
@@ -683,7 +747,7 @@ export default function PerguntasPage() {
           <div className="w-full max-w-lg rounded-3xl border border-slate-100 bg-white p-6 shadow-2xl animate-in zoom-in-95 duration-200">
             <div className="mb-6 flex items-center justify-between">
               <h3 className="text-lg font-bold text-slate-900 flex items-center gap-2">
-                <Sparkles className="h-5 w-5 text-emerald-600 shrink-0" />
+                <Sparkles className="h-5 w-5 text-indigo-600 shrink-0" />
                 {modalType === 'create' ? 'Cadastrar Pergunta' : 'Editar Pergunta'}
               </h3>
               <button
@@ -702,7 +766,7 @@ export default function PerguntasPage() {
                   value={modalFormData.faseId}
                   onChange={(e) => setModalFormData({ ...modalFormData, faseId: e.target.value })}
                   disabled={modalType === 'edit'}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 disabled:opacity-60 cursor-pointer"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 disabled:opacity-60 cursor-pointer"
                 >
                   {fases.map((fase) => (
                     <option key={fase.id} value={fase.id}>
@@ -712,17 +776,43 @@ export default function PerguntasPage() {
                 </select>
               </div>
 
-              {/* Ordem da Pergunta (1 ou 2) */}
+              {/* Ordem da Pergunta */}
               <div>
                 <label className="block text-sm font-semibold text-slate-700 mb-1.5">Ordem da Pergunta</label>
-                <select
+                <input
+                  type="number"
+                  min={1}
+                  max={100}
                   value={modalFormData.ordem}
-                  onChange={(e) => setModalFormData({ ...modalFormData, ordem: parseInt(e.target.value) })}
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500 cursor-pointer"
+                  onChange={(e) => setModalFormData({ ...modalFormData, ordem: parseInt(e.target.value) || 1 })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                />
+              </div>
+
+              {/* Peso da Pergunta */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Peso de Importância (1 a 3)</label>
+                <select
+                  value={modalFormData.peso}
+                  onChange={(e) => setModalFormData({ ...modalFormData, peso: parseInt(e.target.value) || 1 })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
                 >
-                  <option value={1}>Pergunta 1 (Início de Fase)</option>
-                  <option value={2}>Pergunta 2 (Conclusão de Fase)</option>
+                  <option value={1}>Peso 1 (Baixo)</option>
+                  <option value={2}>Peso 2 (Médio)</option>
+                  <option value={3}>Peso 3 (Crítico - gera alerta crítico se respondido NÃO)</option>
                 </select>
+              </div>
+
+              {/* Identificador Único */}
+              <div>
+                <label className="block text-sm font-semibold text-slate-700 mb-1.5">Identificador Único (Ex: INF-01, ELE-15)</label>
+                <input
+                  type="text"
+                  placeholder="Ex: INF-01"
+                  value={modalFormData.identificadorUnico}
+                  onChange={(e) => setModalFormData({ ...modalFormData, identificadorUnico: e.target.value })}
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3.5 py-2.5 text-sm text-slate-800 focus:bg-white focus:border-indigo-500 focus:outline-none focus:ring-1 focus:ring-indigo-500 cursor-pointer"
+                />
               </div>
 
               {/* Texto da Pergunta */}
@@ -733,7 +823,7 @@ export default function PerguntasPage() {
                   value={modalFormData.texto}
                   onChange={(e) => setModalFormData({ ...modalFormData, texto: e.target.value })}
                   placeholder="Ex: A alvenaria do 1º andar foi concluída?"
-                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-emerald-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-emerald-500/20 transition-all resize-none"
+                  className="w-full rounded-xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-indigo-500 focus:bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all resize-none"
                 />
               </div>
 
@@ -749,7 +839,7 @@ export default function PerguntasPage() {
                 <button
                   type="submit"
                   disabled={saving}
-                  className="w-full sm:w-auto rounded-xl bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-emerald-700 transition-colors active:scale-95 disabled:opacity-60 cursor-pointer"
+                  className="w-full sm:w-auto rounded-xl bg-indigo-600 px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors active:scale-95 disabled:opacity-60 cursor-pointer"
                 >
                   {saving ? 'Salvando...' : 'Salvar Pergunta'}
                 </button>

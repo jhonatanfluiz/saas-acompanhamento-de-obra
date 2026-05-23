@@ -31,8 +31,8 @@ export default function ProgressChart({ data, title }: ProgressChartProps) {
         <AreaChart data={data} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
           <defs>
             <linearGradient id="colorReal" x1="0" y1="0" x2="0" y2="1">
-              <stop offset="5%" stopColor="#059669" stopOpacity={0.1}/>
-              <stop offset="95%" stopColor="#059669" stopOpacity={0}/>
+              <stop offset="5%" stopColor="#4f46e5" stopOpacity={0.1}/>
+              <stop offset="95%" stopColor="#4f46e5" stopOpacity={0}/>
             </linearGradient>
             <linearGradient id="colorMeta" x1="0" y1="0" x2="0" y2="1">
               <stop offset="5%" stopColor="#64748b" stopOpacity={0.1}/>
@@ -66,7 +66,7 @@ export default function ProgressChart({ data, title }: ProgressChartProps) {
             type="monotone" 
             dataKey="real" 
             name="Progresso Real"
-            stroke="#059669" 
+            stroke="#4f46e5" 
             strokeWidth={3}
             fillOpacity={1} 
             fill="url(#colorReal)" 
